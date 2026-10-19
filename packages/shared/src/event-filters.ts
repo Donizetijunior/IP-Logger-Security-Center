@@ -20,13 +20,15 @@ export const eventFilterSchema = z.object({
 export type EventFilters = z.infer<typeof eventFilterSchema>;
 
 /** Monta cláusulas WHERE parametrizadas (alias "e" = access_events). Compartilhado entre API e exportação. */
-export function buildEventWhere(f: EventFilters, startIndex = 0): { clauses: string[]; params: unknown[] } {
+export function buildEventWhere(f: EventFilters, startIndex = 0, ownerId?: string | null): { clauses: string[]; params: unknown[] } {
   const clauses: string[] = [];
   const params: unknown[] = [];
   const p = (v: unknown) => {
     params.push(v);
     return `$${startIndex + params.length}`;
   };
+  // Escopo multiusuário: usuários comuns só enxergam eventos dos próprios links
+  if (ownerId) clauses.push(`e.short_link_id IN (SELECT id FROM short_links WHERE owner_id = ${p(ownerId)}::uuid)`);
   if (f.ip) {
     const ip = normalizeIp(f.ip);
     if (!ip) throw new FilterError('IP inválido');

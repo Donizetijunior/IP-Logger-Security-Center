@@ -38,6 +38,10 @@ Roda no worker diariamente (e na inicialização se a última execução passou 
 | `REDIS_PASSWORD` | Atualizar `.env` e `docker compose up -d` (a fila é reidratada pela outbox). |
 | `TOTP_ENCRYPTION_KEY` | Exige recriar o admin (o segredo TOTP é cifrado com ela). |
 
+## Gestão de usuários e moderação
+
+Veja [multiuser.md](multiuser.md). Rotina sugerida: revisar *Denúncias* e *Usuários → Aguardando aprovação* diariamente; ao receber uma denúncia procedente, **desativar o link e suspender o dono**; para pedidos de exclusão de titulares, o usuário pode excluir a própria conta ou o admin usar *Excluir* em *Usuários*.
+
 ## Resposta a incidentes (resumo)
 
 1. **Suspeita de acesso indevido ao painel:** `UPDATE admin_sessions SET revoked_at = now()` (revoga todas), troque a senha (recriar admin), revise `/configuracoes → Auditoria`.

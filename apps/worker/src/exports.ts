@@ -24,14 +24,14 @@ interface Row {
 }
 
 export async function generateExport(pool: Pool, exportId: string): Promise<void> {
-  const { rows } = await pool.query<{ format: 'csv' | 'json'; filters: unknown; mask_ip: boolean }>(
-    `UPDATE exports SET status = 'processing' WHERE id = $1 AND status = 'pending' AND expires_at > now() RETURNING format, filters, mask_ip`, [exportId],
+  const { rows } = await pool.query<{ format: 'csv' | 'json'; filters: unknown; mask_ip: boolean; scope_owner_id: string | null }>(
+    `UPDATE exports SET status = 'processing' WHERE id = $1 AND status = 'pending' AND expires_at > now() RETURNING format, filters, mask_ip, scope_owner_id`, [exportId],
   );
   const job = rows[0];
   if (!job) return;
   try {
     const filters = eventFilterSchema.parse(job.filters);
-    const { clauses, params } = buildEventWhere(filters);
+    const { clauses, params } = buildEventWhere(filters, 0, job.scope_owner_id);
     params.push(MAX_ROWS);
     const data = await pool.query<Row>(
       `SELECT e.id, e.occurred_at, e.slug, host(e.ip_address) AS ip, e.method, e.http_status, e.client_class, e.browser, e.os,

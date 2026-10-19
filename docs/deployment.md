@@ -75,3 +75,29 @@ O desenho assume Caddy como único proxy. Se colocar um CDN/LB na frente, **o IP
 ## 9. Checklist de produção
 
 Veja [acceptance-checklist.md](acceptance-checklist.md#checklist-de-homologação-e-produção).
+
+## 10. Publicar com domínio próprio via Cloudflare Tunnel (ex.: iplogger.com.br)
+
+Para servidores com IP privado/CGNAT ou sem portas liberadas. A Cloudflare termina o TLS e o contêiner `cloudflared` leva o tráfego ao Caddy; **nenhuma porta é aberta no roteador**.
+
+1. **Domínio na Cloudflare:** adicione `iplogger.com.br` à sua conta e aponte os *nameservers* do registro.br para os da Cloudflare.
+2. **Túnel:** *Zero Trust → Networks → Tunnels → Create* (tipo Cloudflared). Copie o **token**.
+3. **Hostnames públicos** do túnel (ambos para o serviço **HTTP** `caddy:80`):
+   - `iplogger.com.br` → links curtos (`https://iplogger.com.br/<slug>`; a raiz redireciona para o painel)
+   - `painel.iplogger.com.br` → painel (login, cadastro, termos, denúncias)
+4. **`.env`** (no servidor):
+   ```dotenv
+   LINKS_SITE=http://iplogger.com.br
+   PANEL_SITE=http://painel.iplogger.com.br
+   PUBLIC_SHORT_BASE_URL=https://iplogger.com.br
+   PUBLIC_DASHBOARD_URL=https://painel.iplogger.com.br
+   COOKIE_SECURE=true
+   CLOUDFLARE_TUNNEL_TOKEN=<token>
+   SIGNUP_MODE=approval        # open | approval | closed (ver docs/multiuser.md)
+   NODE_ENV=production
+   LEGAL_REVIEW_ACKNOWLEDGED=true   # SOMENTE após a decisão jurídica documentada
+   ```
+5. **Subir:** `docker compose --profile tunnel up -d --build`
+6. **Verificar o IP real do visitante:** abra um link de fora da sua rede e confira o IP no painel. O Caddy só confia no cabeçalho `CF-Connecting-IP` quando a conexão vem do contêiner `cloudflared` (IP fixo `IPLC_TUNNEL_IP`); de qualquer outra origem o cabeçalho é descartado (testado em `tests/e2e`).
+
+Notas: use *SSL/TLS = Full* e ative HSTS na Cloudflare se desejar; a Cloudflare passa a ver o tráfego (considere isso na avaliação de privacidade/transferência internacional). Para acesso direto por LAN durante testes, use `curl -H "Host: …"`.

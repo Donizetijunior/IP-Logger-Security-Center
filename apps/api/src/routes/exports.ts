@@ -4,7 +4,7 @@ import { eventFilterSchema } from '@ipl/shared';
 import { AuthService } from '../auth.ts';
 import { audit } from '../audit.ts';
 import type { Ctx } from '../context.ts';
-import { HttpError, iso } from '../util.ts';
+import { HttpError, iso, ownerScope } from '../util.ts';
 
 const createBody = z.object({
   format: z.enum(['csv', 'json']),
@@ -19,18 +19,18 @@ export function registerExports(app: FastifyInstance, ctx: Ctx): void {
   app.post('/exports', async (req, reply) => {
     const session = req.session!;
     if (!AuthService.isRecentlyReauthenticated(session)) {
-      await audit(pool, { adminId: session.adminId, action: 'export.create', result: 'denied', metadata: { reason: 'reauth_required' } });
+      await audit(pool, { accountId: session.accountId, action: 'export.create', result: 'denied', metadata: { reason: 'reauth_required' } });
       throw new HttpError(403, 'reauth_required', 'Confirme sua senha para exportar dados');
     }
     const body = createBody.parse(req.body);
     const { rows } = await pool.query<{ id: string; expires_at: Date }>(
-      `INSERT INTO exports (admin_id, format, filters, mask_ip, expires_at)
-       VALUES ($1, $2, $3, $4, now() + ($5 || ' minutes')::interval) RETURNING id, expires_at`,
-      [session.adminId, body.format, JSON.stringify(body.filters), !body.fullIp, String(config.EXPORT_TTL_MINUTES)],
+      `INSERT INTO exports (account_id, format, filters, mask_ip, expires_at, scope_owner_id)
+       VALUES ($1, $2, $3, $4, now() + ($5 || ' minutes')::interval, $6) RETURNING id, expires_at`,
+      [session.accountId, body.format, JSON.stringify(body.filters), !body.fullIp, String(config.EXPORT_TTL_MINUTES), ownerScope(req)],
     );
     const row = rows[0]!;
     await audit(pool, {
-      adminId: session.adminId, action: 'export.create', resource: `export:${row.id}`, result: 'success',
+      accountId: session.accountId, action: 'export.create', resource: `export:${row.id}`, result: 'success',
       // o IP filtrado é dado pessoal: a auditoria registra apenas que o filtro foi usado
       metadata: { format: body.format, filters: { ...body.filters, ip: body.filters.ip ? '[informado]' : undefined }, fullIp: body.fullIp },
     });
@@ -40,7 +40,7 @@ export function registerExports(app: FastifyInstance, ctx: Ctx): void {
   app.get('/exports', async (req) => {
     const { rows } = await pool.query<{ id: string; format: string; status: string; row_count: number | null; created_at: Date; expires_at: Date; mask_ip: boolean }>(
       `SELECT id, format, status, row_count, created_at, expires_at, mask_ip FROM exports
-       WHERE admin_id = $1 AND expires_at > now() ORDER BY created_at DESC LIMIT 20`, [req.session!.adminId],
+       WHERE account_id = $1 AND expires_at > now() ORDER BY created_at DESC LIMIT 20`, [req.session!.accountId],
     );
     return {
       items: rows.map((r) => ({
@@ -52,7 +52,7 @@ export function registerExports(app: FastifyInstance, ctx: Ctx): void {
   app.get('/exports/:id', async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
     const { rows } = await pool.query<{ id: string; format: string; status: string; row_count: number | null; expires_at: Date }>(
-      'SELECT id, format, status, row_count, expires_at FROM exports WHERE id = $1 AND admin_id = $2 AND expires_at > now()', [id, req.session!.adminId],
+      'SELECT id, format, status, row_count, expires_at FROM exports WHERE id = $1 AND account_id = $2 AND expires_at > now()', [id, req.session!.accountId],
     );
     if (!rows[0]) throw new HttpError(404, 'not_found', 'Exportação não encontrada ou expirada');
     return { id: rows[0].id, format: rows[0].format, status: rows[0].status, rowCount: rows[0].row_count, expiresAt: iso(rows[0].expires_at) };
@@ -61,12 +61,12 @@ export function registerExports(app: FastifyInstance, ctx: Ctx): void {
   app.get('/exports/:id/download', async (req, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
     const { rows } = await pool.query<{ format: string; status: string; content: string | null }>(
-      'SELECT format, status, content FROM exports WHERE id = $1 AND admin_id = $2 AND expires_at > now()', [id, req.session!.adminId],
+      'SELECT format, status, content FROM exports WHERE id = $1 AND account_id = $2 AND expires_at > now()', [id, req.session!.accountId],
     );
     const ex = rows[0];
     if (!ex) throw new HttpError(404, 'not_found', 'Exportação não encontrada ou expirada');
     if (ex.status !== 'ready' || ex.content === null) throw new HttpError(409, 'not_ready', 'Exportação ainda em processamento');
-    await audit(pool, { adminId: req.session!.adminId, action: 'export.download', resource: `export:${id}`, result: 'success' });
+    await audit(pool, { accountId: req.session!.accountId, action: 'export.download', resource: `export:${id}`, result: 'success' });
     return reply
       .header('content-disposition', `attachment; filename="eventos-${id.slice(0, 8)}.${ex.format}"`)
       .type(ex.format === 'csv' ? 'text/csv; charset=utf-8' : 'application/json; charset=utf-8')

@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { buildEventWhere, eventFilterSchema, normalizeIp } from '@ipl/shared';
 import type { Ctx } from '../context.ts';
-import { HttpError, decodeCursor, encodeCursor, iso } from '../util.ts';
+import { HttpError, decodeCursor, encodeCursor, iso, ownerScope } from '../util.ts';
 
 const listQuery = eventFilterSchema.extend({
   limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -51,7 +51,7 @@ export function registerEvents(app: FastifyInstance, ctx: Ctx): void {
   app.get('/events', async (req) => {
     const q = listQuery.parse(req.query);
     const { limit, cursor, ...filters } = q;
-    const { clauses, params } = buildEventWhere(filters);
+    const { clauses, params } = buildEventWhere(filters, 0, ownerScope(req));
     const cur = decodeCursor(cursor);
     if (cur) {
       params.push(cur.t, cur.id);
@@ -76,8 +76,9 @@ export function registerEvents(app: FastifyInstance, ctx: Ctx): void {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
     const { rows } = await pool.query<EventRow & { link_label: string | null; target_url: string | null }>(
       `SELECT ${EVENT_COLS}, l.label AS link_label, l.target_url
-       FROM access_events e LEFT JOIN short_links l ON l.id = e.short_link_id WHERE e.id = $1`,
-      [id],
+       FROM access_events e LEFT JOIN short_links l ON l.id = e.short_link_id
+       WHERE e.id = $1 AND ($2::uuid IS NULL OR l.owner_id = $2)`,
+      [id, ownerScope(req)],
     );
     const ev = rows[0];
     if (!ev) throw new HttpError(404, 'not_found', 'Evento não encontrado');
@@ -106,24 +107,29 @@ export function registerEvents(app: FastifyInstance, ctx: Ctx): void {
     const query = z.object({ rdap: z.enum(['true', 'false']).default('false') }).parse(req.query);
     const ip = normalizeIp(params.ip);
     if (!ip) throw new HttpError(400, 'invalid_ip', 'IP inválido');
+    const owner = ownerScope(req);
+    const inScope = 'e.short_link_id IN (SELECT id FROM short_links WHERE owner_id = $2)';
 
     const [timeline, links, intel, totals] = await Promise.all([
       pool.query<EventRow>(
-        `SELECT ${EVENT_COLS} FROM access_events e WHERE e.ip_address = $1::inet ORDER BY e.occurred_at DESC, e.id DESC LIMIT 200`, [ip],
+        `SELECT ${EVENT_COLS} FROM access_events e WHERE e.ip_address = $1::inet AND ($2::uuid IS NULL OR ${inScope}) ORDER BY e.occurred_at DESC, e.id DESC LIMIT 200`, [ip, owner],
       ),
       pool.query<{ id: string; slug: string; label: string | null; hits: number; last_at: Date }>(
         `SELECT l.id, l.slug, l.label, count(*)::int AS hits, max(e.occurred_at) AS last_at
          FROM access_events e JOIN short_links l ON l.id = e.short_link_id
-         WHERE e.ip_address = $1::inet GROUP BY l.id, l.slug, l.label ORDER BY hits DESC LIMIT 50`, [ip],
+         WHERE e.ip_address = $1::inet AND ($2::uuid IS NULL OR l.owner_id = $2) GROUP BY l.id, l.slug, l.label ORDER BY hits DESC LIMIT 50`, [ip, owner],
       ),
       pool.query<{ source: string; status: string; checked_at: Date; expires_at: Date; data_redacted: unknown; error_code: string | null }>(
         'SELECT source, status, checked_at, expires_at, data_redacted, error_code FROM ip_intelligence WHERE ip_address = $1::inet ORDER BY source', [ip],
       ),
       pool.query<{ total: number; first_at: Date | null; last_at: Date | null; max_score: number | null }>(
         `SELECT count(*)::int AS total, min(occurred_at) AS first_at, max(occurred_at) AS last_at, max(risk_score) AS max_score
-         FROM access_events WHERE ip_address = $1::inet`, [ip],
+         FROM access_events e WHERE e.ip_address = $1::inet AND ($2::uuid IS NULL OR ${inScope})`, [ip, owner],
       ),
     ]);
+
+    // Usuários comuns só podem investigar IPs que acessaram os próprios links
+    if (owner && totals.rows[0]!.total === 0) throw new HttpError(404, 'not_found', 'Nenhum acesso deste IP aos seus links');
 
     let rdap: unknown = intel.rows.find((i) => i.source === 'rdap')?.data_redacted ?? null;
     if (query.rdap === 'true' && config_rdap(ctx)) {

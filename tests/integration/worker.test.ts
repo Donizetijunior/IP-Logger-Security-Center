@@ -278,8 +278,10 @@ describe('alertas', () => {
   it('detecta taxa anômala por IP, IP em múltiplos links e falha de captura', async () => {
     const cfg = loadConfig(testEnv({ RATE_ANOMALY_THRESHOLD: '5', MULTI_LINK_THRESHOLD: '3' }));
     const links: string[] = [];
+    const { rows: own } = await pool.query<{ id: string }>("INSERT INTO accounts (email, password_hash, role, status) VALUES ('dono@example.org', 'x', 'user', 'active') RETURNING id");
+    const ownerId = own[0]!.id;
     for (let i = 0; i < 3; i++) {
-      const { rows } = await pool.query<{ id: string }>("INSERT INTO short_links (slug, target_url) VALUES ($1, 'https://example.org') RETURNING id", [`link-${i}-xyz`]);
+      const { rows } = await pool.query<{ id: string }>("INSERT INTO short_links (slug, target_url, owner_id) VALUES ($1, 'https://example.org', $2) RETURNING id", [`link-${i}-xyz`, ownerId]);
       links.push(rows[0]!.id);
     }
     for (let i = 0; i < 6; i++) await insertEvent('8.8.8.8', { linkId: links[i % 3] });
@@ -311,7 +313,7 @@ describe('expurgo de 30 dias (CA-16, CA-18)', () => {
     }
     await pool.query("INSERT INTO risk_assessments (access_event_id, score, level, engine_version) VALUES ($1, 10, 'low', '1.0.0')", [old]);
     await pool.query("INSERT INTO alerts (type, severity, title, ip_address, dedupe_key, created_at) VALUES ('ip_high_risk', 'high', 'x', '8.8.8.8', 'k1', now() - interval '32 days')");
-    await pool.query("INSERT INTO exports (admin_id, format, expires_at) SELECT id, 'csv', now() - interval '1 minute' FROM admins LIMIT 1");
+    await pool.query("INSERT INTO exports (account_id, format, expires_at) SELECT id, 'csv', now() - interval '1 minute' FROM accounts LIMIT 1");
 
     const res = await runPurge(pool, { retentionDays: 30, auditRetentionDays: 365 });
     expect(res.deleted.access_events).toBe(2);
@@ -346,9 +348,9 @@ describe('expurgo de 30 dias (CA-16, CA-18)', () => {
 
 describe('exportação (CA-17)', () => {
   async function createExport(format: 'csv' | 'json', filters: Record<string, unknown>, maskIp: boolean) {
-    const { rows: ad } = await pool.query<{ id: string }>(`INSERT INTO admins (email, password_hash, totp_secret_encrypted) VALUES ('a@example.org', 'x', 'y') ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email RETURNING id`);
+    const { rows: ad } = await pool.query<{ id: string }>(`INSERT INTO accounts (email, password_hash, totp_secret_encrypted) VALUES ('a@example.org', 'x', 'y') ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email RETURNING id`);
     const { rows } = await pool.query<{ id: string }>(
-      `INSERT INTO exports (admin_id, format, filters, mask_ip, expires_at) VALUES ($1, $2, $3, $4, now() + interval '30 minutes') RETURNING id`,
+      `INSERT INTO exports (account_id, format, filters, mask_ip, expires_at) VALUES ($1, $2, $3, $4, now() + interval '30 minutes') RETURNING id`,
       [ad[0]!.id, format, JSON.stringify(filters), maskIp],
     );
     return rows[0]!.id;

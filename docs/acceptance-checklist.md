@@ -9,9 +9,9 @@ Legenda: ✅ verificado por teste automatizado executado e aprovado · 🧪 veri
 | Suíte | Comando | Resultado |
 |---|---|---|
 | Tipos (api, worker, shared, testes) + web | `npm run typecheck` / `npm run typecheck:web` | sem erros |
-| Unitários, integração (Postgres/Redis reais), segurança | `npm test` | **159 aprovados** em 5 arquivos (shared 66 · API 40 · worker 25 · provedores 14 · segurança 14) |
+| Unitários, integração (Postgres/Redis reais), segurança | `npm test` | **182 aprovados** em 6 arquivos (shared 67 · API 40 · multiusuário 22 · worker 25 · provedores 14 · segurança 14) |
 | Build do painel | `npm run build:web` | ok (JS 315 kB / 98 kB gzip) |
-| E2E no stack Compose (Caddy→API→Postgres/Redis/Worker) | `npx vitest run tests/e2e` | **12/12 aprovados**, incluindo quedas reais de Redis e Postgres |
+| E2E no stack Compose (Caddy→API→Postgres/Redis/Worker) | `npx vitest run tests/e2e` | **13/13 aprovados** (rodado sobre um banco migrado da v0.1), incluindo quedas reais de Redis e Postgres e o teste do Cloudflare Tunnel (`CF-Connecting-IP` só do contêiner do túnel) |
 | Smoke test de deploy | `./infra/scripts/smoke-test.sh` | **APROVADO** (contêineres saudáveis, DB/Redis não publicados, 404/401 corretos, CSP/nosniff, `Server` oculto) |
 | OpenAPI | `redocly lint docs/openapi.yaml` | válido (0 erros; avisos de estilo) |
 | Backup/restore reais | `backup.sh` + `restore.sh` | ok; 5 eventos vencidos reintroduzidos pelo backup foram **removidos antes de a API subir** |
@@ -91,3 +91,20 @@ docker compose run --rm -e ADMIN_EMAIL=admin@example.org -e ADMIN_PASSWORD='<sen
 E2E_TOTP_SECRET=<segredo exibido> E2E_PASSWORD='<senha-de-teste>' E2E_PORT=<HTTP_PORT> npm run test:e2e
 E2E_TOTP_SECRET=... E2E_PASSWORD=... npm run test:load
 ```
+
+## Versão 0.2 — multiusuário, cadastro público e túnel
+
+| Item | Resultado | Evidência |
+|---|---|---|
+| Isolamento entre usuários (links, eventos, IPs, painel, alertas, exportações) | ✅ | `multiuser.test.ts` |
+| Cadastro `open`/`approval`/`closed`, termos, senha forte, limite por IP, papel não escalável | ✅ | `multiuser.test.ts` |
+| Cotas, laço de redirect bloqueado, raiz do domínio de links redireciona ao painel | ✅ | `multiuser.test.ts` |
+| Senha temporária + troca obrigatória + aceite de Termos; reset revoga sessões | ✅ | `multiuser.test.ts` |
+| Suspensão revoga sessões e desativa links; dono não reativa link moderado | ✅ | `multiuser.test.ts` |
+| Exclusão (admin e própria conta) apaga links/eventos/alertas | ✅ | `multiuser.test.ts` |
+| Denúncia pública sem IP + moderação | ✅ | `multiuser.test.ts` |
+| Migration 002 sobre banco existente (admin vira dono dos links) | 🧪 | stack local migrado, 3 links com dono |
+| Cloudflare Tunnel: IP real só do contêiner do túnel; cabeçalho forjado descartado | 🧪✅ | E2E + execução manual |
+| Telas (cadastro, login de usuário, painel limitado, Usuários) | 🧪 | verificado no navegador |
+| **Publicação em iplogger.com.br** | ⚠️ pendente | exige token do túnel na Cloudflare e decisão jurídica (`LEGAL_REVIEW_ACKNOWLEDGED`) |
+| Verificação de e-mail / CAPTCHA / MFA para usuários | ⚠️ não implementado | — |

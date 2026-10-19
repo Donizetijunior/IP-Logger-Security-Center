@@ -34,3 +34,16 @@ export function iso(d: Date | string | null | undefined): string | null {
   if (!d) return null;
   return d instanceof Date ? d.toISOString() : new Date(d).toISOString();
 }
+
+import type { FastifyRequest } from 'fastify';
+
+/** null = administrador (vê tudo); caso contrário o id do dono cujos dados podem ser vistos. */
+export function ownerScope(req: FastifyRequest): string | null {
+  const s = req.session;
+  if (!s) throw new HttpError(401, 'unauthenticated', 'Autenticação necessária');
+  return s.role === 'admin' ? null : s.accountId;
+}
+
+export function requireAdmin(req: FastifyRequest): void {
+  if (req.session?.role !== 'admin') throw new HttpError(403, 'forbidden', 'Acesso restrito ao administrador');
+}

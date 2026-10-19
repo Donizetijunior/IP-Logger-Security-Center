@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { Ctx } from '../context.ts';
-import { iso } from '../util.ts';
+import { iso, ownerScope } from '../util.ts';
 
 const PERIODS = {
   '24h': { interval: '24 hours', step: '1 hour' },
@@ -17,6 +17,7 @@ export function registerDashboard(app: FastifyInstance, ctx: Ctx): void {
   app.get('/dashboard/summary', async (req) => {
     const { period } = periodQuery.parse(req.query);
     const { interval } = PERIODS[period];
+    const owner = ownerScope(req);
     const [agg, links, alerts, capture, heartbeat] = await Promise.all([
       pool.query<Record<string, number>>(
         `SELECT count(*)::int AS requests_total,
@@ -28,16 +29,20 @@ export function registerDashboard(app: FastifyInstance, ctx: Ctx): void {
                 count(*) FILTER (WHERE risk_level = 'high')::int AS high_risk,
                 count(*) FILTER (WHERE enrichment_status = 'failed')::int AS enrichment_failed,
                 count(*) FILTER (WHERE enrichment_status = 'pending')::int AS enrichment_pending
-         FROM access_events WHERE occurred_at >= now() - $1::interval`, [interval],
+         FROM access_events WHERE occurred_at >= now() - $1::interval
+           AND ($2::uuid IS NULL OR short_link_id IN (SELECT id FROM short_links WHERE owner_id = $2))`, [interval, owner],
       ),
       pool.query<{ n: number }>(
-        `SELECT count(*)::int AS n FROM short_links WHERE deleted_at IS NULL AND is_active AND (expires_at IS NULL OR expires_at > now())`,
+        `SELECT count(*)::int AS n FROM short_links WHERE deleted_at IS NULL AND is_active AND (expires_at IS NULL OR expires_at > now())
+         AND ($1::uuid IS NULL OR owner_id = $1)`, [owner],
       ),
       pool.query<{ severity: string; n: number }>(
-        `SELECT severity, count(*)::int AS n FROM alerts WHERE status <> 'resolved' GROUP BY severity`,
+        `SELECT severity, count(*)::int AS n FROM alerts WHERE status <> 'resolved'
+         AND ($1::uuid IS NULL OR short_link_id IN (SELECT id FROM short_links WHERE owner_id = $1)) GROUP BY severity`, [owner],
       ),
       pool.query<{ n: number | null }>(
-        `SELECT COALESCE(sum(value), 0)::int AS n FROM telemetry_counters WHERE key = 'capture_failed' AND bucket >= now() - $1::interval`, [interval],
+        // contadores operacionais globais: apenas para o administrador
+        `SELECT COALESCE(sum(value), 0)::int AS n FROM telemetry_counters WHERE key = 'capture_failed' AND bucket >= now() - $1::interval AND $2::boolean`, [interval, owner === null],
       ),
       pool.query<{ value: { at?: string }; updated_at: Date }>(`SELECT value, updated_at FROM job_state WHERE key = 'worker_heartbeat'`),
     ]);
@@ -57,13 +62,14 @@ export function registerDashboard(app: FastifyInstance, ctx: Ctx): void {
       enrichmentPending: a.enrichment_pending,
       captureFailures: capture.rows[0]?.n ?? 0,
       openAlerts: Object.fromEntries(alerts.rows.map((r) => [r.severity, r.n])),
-      workerHeartbeatAt: hb ? iso(hb.updated_at) : null,
+      workerHeartbeatAt: hb && owner === null ? iso(hb.updated_at) : null,
     };
   });
 
   app.get('/dashboard/timeseries', async (req) => {
     const { period } = periodQuery.parse(req.query);
     const { interval, step } = PERIODS[period];
+    const owner = ownerScope(req);
     const { rows } = await pool.query<{ bucket: Date; total: number; human: number; bot: number; preview: number }>(
       `WITH series AS (
          SELECT generate_series(
@@ -76,11 +82,12 @@ export function registerDashboard(app: FastifyInstance, ctx: Ctx): void {
                 count(*) FILTER (WHERE client_class = 'human_probable' AND method = 'GET')::int AS human,
                 count(*) FILTER (WHERE client_class = 'bot')::int AS bot,
                 count(*) FILTER (WHERE client_class = 'preview')::int AS preview
-         FROM access_events WHERE occurred_at >= now() - $1::interval GROUP BY 1
+         FROM access_events WHERE occurred_at >= now() - $1::interval
+           AND ($3::uuid IS NULL OR short_link_id IN (SELECT id FROM short_links WHERE owner_id = $3)) GROUP BY 1
        )
        SELECT s.bucket, COALESCE(c.total, 0) AS total, COALESCE(c.human, 0) AS human, COALESCE(c.bot, 0) AS bot, COALESCE(c.preview, 0) AS preview
        FROM series s LEFT JOIN counts c USING (bucket) ORDER BY s.bucket`,
-      [interval, step],
+      [interval, step, owner],
     );
     return {
       period,

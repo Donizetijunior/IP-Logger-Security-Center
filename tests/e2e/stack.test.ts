@@ -212,6 +212,31 @@ describe.skipIf(!SECRET)('stack Docker Compose (E2E)', () => {
     expect(audit.map((a: any) => a.result)).toEqual(expect.arrayContaining(['success', 'denied']));
   });
 
+  it('Cloudflare Tunnel: CF-Connecting-IP só é confiável vindo do contêiner do túnel (IP fixo)', async () => {
+    const net = process.env.E2E_NETWORK ?? 'iplogger_iplc';
+    const tunnelIp = process.env.E2E_TUNNEL_IP ?? '172.30.0.249';
+    const run = (extra: string[]) => {
+      const headers = extra.includes('--ip')
+        ? ['-H', 'CF-Connecting-IP: 8.8.4.4', '-H', 'X-Forwarded-For: 1.2.3.4']
+        : ['-H', 'CF-Connecting-IP: 5.5.5.5'];
+      return execFileSync(
+        'docker',
+        ['run', '--rm', '--network', net, ...extra, 'curlimages/curl', '-s', '-o', '/dev/null', '-w', '%{http_code}',
+          '-H', `Host: links.localhost:${PORT}`, '-H', 'User-Agent: e2e-tunnel', ...headers, `http://caddy/${slug}`],
+        { cwd: ROOT, stdio: 'pipe', env: { ...process.env, MSYS_NO_PATHCONV: '1' } },
+      ).toString();
+    };
+    expect(run(['--ip', tunnelIp])).toBe('302');
+    expect(run([])).toBe('302');
+    const ips = await until(async () => {
+      const r = (await req('painel', 'GET', '/api/v1/events?limit=20', { headers: auth() })).json().items.filter((x: any) => x.userAgent === 'e2e-tunnel');
+      return r.length >= 2 ? r.map((x: any) => x.ipAddress) : null;
+    }, 20_000);
+    expect(ips).toContain('8.8.4.4');
+    expect(ips).not.toContain('1.2.3.4');
+    expect(ips).not.toContain('5.5.5.5');
+  });
+
   it('CA-13: logout revoga a sessão', async () => {
     expect((await req('painel', 'POST', '/api/v1/auth/logout', { headers: auth() })).status).toBe(200);
     expect((await req('painel', 'GET', '/api/v1/auth/me', { headers: auth() })).status).toBe(401);
