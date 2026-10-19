@@ -8,7 +8,7 @@ Plataforma de links curtos com registro de acessos, enriquecimento assíncrono d
 
 - Cria links curtos (`GET /{slug}` → **HTTP 302 imediato**, `Cache-Control: no-store`, sem página intermediária e sem JavaScript no destino).
 - Registra cada requisição (IP, horário UTC, link, método, User-Agent/idioma saneados, origem do Referer) e a classifica como *provável usuário*, *robô*, *prévia de link* ou *sondagem HEAD* — **uma requisição não é um clique humano confirmado**.
-- Enriquece **em background** (nunca no caminho do redirect): GeoLite2/ASN local, DNS reverso, lista de saídas Tor, AbuseIPDB e GreyNoise Community (opt-in), RDAP sob demanda.
+- Enriquece **em background** (nunca no caminho do redirect): geolocalização/ASN local (DB-IP Lite ou GeoLite2), DNS reverso, lista de saídas Tor, AbuseIPDB e GreyNoise Community (opt-in), RDAP sob demanda.
 - Calcula um **risk score explicável e versionado** (regra, peso, valor, fonte, horário) e gera alertas internos (somente no painel).
 - Painel em pt-BR: visão geral, links, eventos com filtros, detalhe do evento, investigação de IP, alertas, saúde das integrações, auditoria.
 - **Ferramentas** para usuários logados (meu IP/UA, consulta de IP, WHOIS/RDAP, fabricante por MAC, verificador de URL com proteção SSRF, notas privadas autodestrutivas, geradores): [docs/tools.md](docs/tools.md).
@@ -70,7 +70,7 @@ Veja [docs/open-source.md](docs/open-source.md) (escolha de licença, o que nunc
 ## Limitações conhecidas (leia antes de usar)
 
 - Geolocalização e reputação referem-se ao **endereço de rede** (NAT/VPN/CGNAT), não a uma pessoa.
-- Adaptadores AbuseIPDB/GreyNoise e GeoLite2 foram validados **apenas com simulações HTTP / sem bases reais** (não havia chaves); valide com credenciais próprias antes de depender deles ([docs/threat-intelligence.md](docs/threat-intelligence.md)).
+- Os adaptadores AbuseIPDB/GreyNoise foram validados **apenas com simulações HTTP** (não havia chaves); valide com credenciais próprias antes de depender deles. A geolocalização foi validada com a base real DB-IP Lite ([docs/threat-intelligence.md](docs/threat-intelligence.md)).
 - Instância única de API (cache de links em memória). Para escalar horizontalmente é preciso invalidar o cache de forma compartilhada.
 - O cadastro `open` **não verifica e-mail** (sem SMTP) e não há CAPTCHA: leia o aviso de abuso em [docs/multiuser.md](docs/multiuser.md#risco-de-abuso-leitura-obrigatória-antes-de-abrir-ao-público).
 - Medições de desempenho foram feitas em Docker Desktop (Windows), não na VPS de referência.

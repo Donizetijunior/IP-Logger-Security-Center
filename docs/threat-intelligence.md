@@ -17,9 +17,9 @@
 
 `GET https://api.greynoise.io/v3/community/<ip>` (cabeçalho `key` se houver). **Somente IPv4 público** (IPv6 não é consultado e não consome cota). 404 = IP não observado ⇒ `no_data` (ausência de contexto, não prova de segurança). Cota do plano Community é pequena (`GREYNOISE_DAILY_QUOTA`=50 como padrão conservador — ajuste conforme seu entitlement).
 
-## GeoLite2 + ASN (local)
+## Geolocalização + ASN (local)
 
-Bases `GeoLite2-City.mmdb` e `GeoLite2-ASN.mmdb` em `/geoip`, atualizadas pelo serviço `geoipupdate` (perfil `geoip`). O worker valida/recarrega por mtime, mantém a base anterior se a nova falhar e mostra o estado no painel. Atribuição MaxMind obrigatória (EULA). **Nunca** promete endereço físico ou identificação de pessoa.
+Bases MMDB em `/geoip`: **DB-IP Lite** (`dbip-city-lite.mmdb`, `dbip-asn-lite.mmdb`; gratuita, CC BY 4.0, sem cadastro; `infra/scripts/update-geoip.sh`) ou **MaxMind GeoLite2** (conta + EULA; serviço `geoipupdate`). O worker valida/recarrega por mtime, mantém a base anterior se a nova falhar e mostra o estado e a atribuição no painel. Nunca promete endereço físico ou identificação de pessoa. Ver [deployment.md](deployment.md#4-geolocalização-local-campo-local-estimado).
 
 ## Tor
 
@@ -27,9 +27,10 @@ Lista oficial `https://check.torproject.org/exit-addresses` a cada 3 h (`TOR_EXI
 
 ## RDAP
 
-Sob demanda (`GET /ips/{ip}?rdap=true`): host **fixo** (`rdap.org`), apenas IP público validado no caminho, `redirect: manual`, timeout 4 s, resposta reduzida e cacheada 24 h. Desligável com `RDAP_ENABLED=false`.
+Sob demanda (`GET /ips/{ip}?rdap=true`, ferramenta WHOIS/RDAP): consulta inicial a `rdap.org`, que **redireciona** ao servidor autoritativo (ARIN, registro.br etc.); cada salto passa pelo cliente seguro (HTTPS obrigatório, DNS com trava, portas 80/443, no máximo 3 redirecionamentos). Apenas IP público validado ou domínio validado vão ao caminho da URL; a resposta é reduzida (sem contatos pessoais). Desligável com `RDAP_ENABLED=false`.
 
 ## Validação realizada vs. pendente
 
 - ✅ Contrato de requisição/resposta, limites, 404/429/401/5xx, timeout, cache, cota e circuito testados com **respostas HTTP simuladas** (apenas em testes).
-- ⚠️ **Não validado contra as APIs reais** nem com bases GeoLite2 reais (sem chaves/licenças no ambiente de desenvolvimento). Antes de produção: habilitar com chave de teste, gerar tráfego de um IP público conhecido e conferir *Configurações → Fontes de inteligência*.
+- ✅ **Geolocalização/ASN validadas com bases reais** (DB-IP Lite em produção: IPv4 e IPv6 resolvidos para cidade/estado/país e ASN). RDAP validado contra serviços reais (IP e domínio).
+- ⚠️ **AbuseIPDB e GreyNoise não validados contra as APIs reais** (sem chaves no ambiente de desenvolvimento). Antes de produção: habilitar com chave de teste, gerar tráfego de um IP público conhecido e conferir *Configurações → Fontes de inteligência*.
