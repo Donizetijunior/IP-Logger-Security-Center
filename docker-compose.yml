@@ -1,0 +1,151 @@
+name: iplogger
+
+# IP Logger Security Center — Docker Compose (VPS Linux)
+# Uso: cp .env.example .env && chmod 600 .env && editar valores && docker compose up -d --build
+# Somente o Caddy publica portas (80/443). PostgreSQL, Redis, API, Web e Worker ficam na rede interna.
+
+x-hardening: &hardening
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+  read_only: true
+  tmpfs: ["/tmp"]
+  networks: [iplc]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+services:
+  caddy:
+    <<: *hardening
+    image: caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.invalid}
+      LINKS_SITE: ${LINKS_SITE:?defina LINKS_SITE}
+      PANEL_SITE: ${PANEL_SITE:?defina PANEL_SITE}
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    # Caddy precisa de /data e /config graváveis (volumes acima) e da porta 80/443
+    cap_add: ["NET_BIND_SERVICE"]
+    depends_on:
+      api: { condition: service_healthy }
+      web: { condition: service_healthy }
+    networks:
+      iplc:
+        ipv4_address: ${IPLC_CADDY_IP:-172.30.0.250}
+    mem_limit: 256m
+
+  api:
+    <<: *hardening
+    build: { context: ., target: api }
+    image: iplogger/api:0.1.0
+    env_file: .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      API_PORT: "3000"
+      TRUSTED_PROXY_CIDRS: ${IPLC_CADDY_IP:-172.30.0.250}/32
+      DATABASE_URL: postgresql://${POSTGRES_USER:-iplogger}:${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-iplogger}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?defina REDIS_PASSWORD}@redis:6379
+    depends_on:
+      postgres: { condition: service_healthy }
+    mem_limit: 512m
+    cpus: 1.0
+
+  web:
+    <<: *hardening
+    build: { context: ., target: web }
+    image: iplogger/web:0.1.0
+    # O binário do Caddy carrega file capability (cap_net_bind_service); sem ela no bounding set o exec falha
+    cap_add: ["NET_BIND_SERVICE"]
+    mem_limit: 64m
+
+  worker:
+    <<: *hardening
+    build: { context: ., target: worker }
+    image: iplogger/worker:0.1.0
+    env_file: .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-iplogger}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-iplogger}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      GEOIP_DIR: /geoip
+    volumes:
+      - geoip:/geoip:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    mem_limit: 512m
+    cpus: 1.0
+
+  postgres:
+    <<: *hardening
+    image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    # PostgreSQL grava em /var/run/postgresql e no volume de dados
+    tmpfs: ["/tmp", "/var/run/postgresql"]
+    cap_drop: ["ALL"]
+    cap_add: ["CHOWN", "SETUID", "SETGID", "FOWNER", "DAC_OVERRIDE"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-iplogger}
+      POSTGRES_USER: ${POSTGRES_USER:-iplogger}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 1g
+    shm_size: 128m
+
+  redis:
+    <<: *hardening
+    image: redis:7-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    # O entrypoint ajusta o dono de /data e rebaixa para o usuário redis (precisa dessas capabilities)
+    cap_add: ["CHOWN", "SETUID", "SETGID", "DAC_OVERRIDE"]
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--requirepass", "${REDIS_PASSWORD}", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 320m
+
+  # Atualização das bases GeoLite2 (opcional): docker compose --profile geoip up -d geoipupdate
+  geoipupdate:
+    <<: *hardening
+    profiles: ["geoip"]
+    image: ghcr.io/maxmind/geoipupdate:v7.1.0
+    environment:
+      GEOIPUPDATE_ACCOUNT_ID: ${MAXMIND_ACCOUNT_ID:-}
+      GEOIPUPDATE_LICENSE_KEY: ${MAXMIND_LICENSE_KEY:-}
+      GEOIPUPDATE_EDITION_IDS: "GeoLite2-City GeoLite2-ASN"
+      GEOIPUPDATE_FREQUENCY: "72"
+      GEOIPUPDATE_DB_DIR: /geoip
+    volumes:
+      - geoip:/geoip
+    read_only: false
+    mem_limit: 64m
+
+networks:
+  iplc:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${IPLC_SUBNET:-172.30.0.0/24}
+
+volumes:
+  pgdata:
+  redisdata:
+  caddy-data:
+  caddy-config:
+  geoip:

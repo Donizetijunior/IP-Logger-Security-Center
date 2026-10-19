@@ -1,0 +1,59 @@
+# Operação
+
+## Observabilidade
+
+| Fonte | O que mostra | Onde |
+|---|---|---|
+| `GET /healthz` | Liveness da API (sem credenciais) | Healthcheck do Docker; **não** exposto pelo Caddy |
+| `GET /readyz` | Readiness (consulta o Postgres) | Só rede interna (recusa conexões via proxy/IP público) |
+| `GET /metrics` | Contadores e p50/p95/p99 do redirect, sem PII | Só rede interna: `docker compose exec api wget -qO- http://127.0.0.1:3000/metrics` |
+| Painel → *Visão geral* | Telemetria perdida, worker sem sinal, KPIs | `/` |
+| Painel → *Configurações e saúde* | Fila, outbox, cotas, circuitos, GeoIP/Tor, último expurgo, auditoria | `/configuracoes` |
+| Alertas internos | `capture_failure`, `outbox_lag`, `queue_stuck`, `worker_down`, `provider_*`, `storage_critical` | `/alertas` |
+
+Logs são JSON em stdout com rotação (`json-file`, 10 MB × 5). **Não contêm** IP, slug, query string, cabeçalhos, cookies ou tokens; a rota é registrada como padrão (`/:slug`). IPs ficam apenas no banco.
+
+`DB_SIZE_ALERT_BYTES` (padrão 10 GiB) e `DISK_CHECK_PATH` (padrão `/`) ajustam o alerta de armazenamento do worker. Não há notificações externas no MVP: acompanhe o painel (e o monitor externo de sua escolha sobre `https://links…/privacy` para disponibilidade).
+
+## Backup e restauração
+
+- **Backup** (cron diário no host): `BACKUP_KEY_FILE=/root/.iplogger-backup.key ./infra/scripts/backup.sh` — `pg_dump -Fc` criptografado com AES-256 (PBKDF2), `sha256`, permissões `600` e **exclusão de cópias com mais de `BACKUP_RETENTION_DAYS` (30)**, para que dados vencidos não vivam indefinidamente em backups.
+- Guarde `BACKUP_KEY_FILE` **fora do servidor** (cofre). Sem ela o backup é irrecuperável.
+- **RPO** alvo: 24 h (backup diário). **RTO** alvo: < 1 h (restauração + subida), a validar no seu ambiente.
+- **Restauração**: `BACKUP_KEY_FILE=… ./infra/scripts/restore.sh backups/iplogger-<data>.dump.enc`. O script verifica o hash, **para api/worker/caddy**, restaura, **executa o expurgo de retenção antes de reabrir as consultas** (CA-18) e só então sobe os serviços.
+- Faça um **teste de restauração periódico** (ao menos trimestral) em ambiente separado.
+- Cópias fora do servidor (rsync/S3) são responsabilidade do operador e devem respeitar a mesma retenção.
+
+## Expurgo (retenção de 30 dias)
+
+Roda no worker diariamente (e na inicialização se a última execução passou de 23 h), em lotes de 5000. Remove: eventos > 30 dias e suas avaliações; alertas com IP; cache de inteligência vencido ou sem evento associado ao IP; exportações expiradas; outbox publicada > 7 dias; desafios/sessões vencidos; auditoria > `AUDIT_RETENTION_DAYS`. Execução manual: `docker compose run --rm --no-deps worker node apps/worker/src/cli/purge.ts`. Último resultado no painel.
+
+## Rotação de credenciais
+
+| Item | Procedimento |
+|---|---|
+| Senha do admin | Hoje: recriar a conta — `DELETE FROM admins` (SQL; remove sessões e códigos em cascata), rodar o bootstrap de novo e guardar novos TOTP/códigos. A auditoria é preservada. (Troca de senha pelo painel não faz parte do MVP.) |
+| Chaves de API (AbuseIPDB/GreyNoise/MaxMind) | Editar `.env` e `docker compose up -d worker`. Revogue a chave antiga no provedor. |
+| `POSTGRES_PASSWORD` | `ALTER USER` no banco, atualizar `.env`, `docker compose up -d`. |
+| `REDIS_PASSWORD` | Atualizar `.env` e `docker compose up -d` (a fila é reidratada pela outbox). |
+| `TOTP_ENCRYPTION_KEY` | Exige recriar o admin (o segredo TOTP é cifrado com ela). |
+
+## Resposta a incidentes (resumo)
+
+1. **Suspeita de acesso indevido ao painel:** `UPDATE admin_sessions SET revoked_at = now()` (revoga todas), troque a senha (recriar admin), revise `/configuracoes → Auditoria`.
+2. **Vazamento de chave de API:** revogue no provedor, gere nova, atualize `.env`.
+3. **Perda de telemetria (alerta `capture_failure`):** verifique `docker compose ps`, logs do Postgres, disco. O redirect segue (fail-open); eventos do período **não são recuperáveis**.
+4. **Dado pessoal solicitado por titular:** pesquise por IP em *Eventos*/*Investigação de IP*; exclusão antecipada é um `DELETE` manual por IP (documente na auditoria) — respeitando obrigações legais de guarda.
+5. **Fila travada / worker parado:** `docker compose logs worker`, `docker compose restart worker`; a outbox reenfileira o que estava pendente.
+
+## Investigar falhas de captura
+
+`capture_failed` (métrica `iplogger_capture_failed_total` e tabela `telemetry_counters`) conta redirects em que a gravação do evento falhou ou excedeu `REDIRECT_DB_TIMEOUT_MS` (400 ms). Causas comuns: Postgres indisponível/saturado, IP do cliente não resolvido. Com o banco fora, links já em cache seguem redirecionando por até `LINK_CACHE_STALE_MS` (1 h); links ainda não vistos retornam `503`.
+
+## Fail-open (política documentada)
+
+O redirect é considerado mais importante que a telemetria: se o PostgreSQL falhar, a API redireciona usando o cache de links e **contabiliza** a perda. **Não há garantia de retenção** de eventos nessa janela. O painel e o alerta `capture_failure` tornam a perda visível.
+
+## Limites e escala
+
+Instância única de API/worker. Concorrência do worker: 4 jobs. Limite de taxa do redirect: `REDIRECT_RATE_LIMIT_PER_MIN` por IP (padrão 1200). Para escalar a API horizontalmente é preciso substituir o cache de links em memória por invalidação compartilhada (Redis pub/sub).
