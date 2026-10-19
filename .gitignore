@@ -11,3 +11,7 @@ coverage/
 
 .demo-credentials.txt
 .server-credentials.txt
+
+admin-totp-qr.png
+
+.backup.key
