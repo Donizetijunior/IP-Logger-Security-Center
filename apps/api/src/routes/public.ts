@@ -3,7 +3,7 @@ import type { Ctx } from '../context.ts';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c);
 
-export function renderPrivacyPage(ctx: Ctx): string {
+export function renderPrivacyPage(ctx: Ctx, geoAttribution: string | null = null): string {
   const { config } = ctx;
   return `<!doctype html>
 <html lang="pt-BR">
@@ -43,6 +43,7 @@ export function renderPrivacyPage(ctx: Ctx): string {
 
 <h2>Importante sobre as estimativas</h2>
 <p>A geolocalização e a reputação referem-se ao <strong>endereço de rede</strong>, que pode ser compartilhado (NAT, VPN, redes corporativas) e não identifica, por si só, uma pessoa.</p>
+${geoAttribution ? `<p><small>${esc(geoAttribution)}</small></p>` : ''}
 
 <h2>Compartilhamento com terceiros</h2>
 <p>O endereço IP público pode ser consultado, de forma automatizada, em serviços de inteligência de ameaças (quando habilitados): AbuseIPDB, GreyNoise e consultas RDAP. IPs privados ou reservados nunca são enviados.</p>
@@ -57,13 +58,20 @@ export function renderPrivacyPage(ctx: Ctx): string {
 }
 
 export function registerPublic(app: FastifyInstance, ctx: Ctx): void {
-  app.get('/privacy', async (_req, reply) =>
-    reply
+  app.get('/privacy', async (_req, reply) => {
+    let attribution: string | null = null;
+    try {
+      const g = await ctx.pool.query<{ a: string | null }>("SELECT value->>'attribution' AS a FROM job_state WHERE key = 'geoip'");
+      attribution = g.rows[0]?.a ?? null;
+    } catch {
+      /* sem banco: a página de privacidade continua disponível */
+    }
+    return reply
       .type('text/html; charset=utf-8')
       .header('content-security-policy', "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
       .header('cache-control', 'public, max-age=300')
-      .send(renderPrivacyPage(ctx)),
-  );
+      .send(renderPrivacyPage(ctx, attribution));
+  });
   // Raiz do domínio de links: leva à plataforma (não há link no caminho vazio)
   app.get('/', async (req, reply) => {
     const host = (req.headers.host ?? '').toLowerCase();

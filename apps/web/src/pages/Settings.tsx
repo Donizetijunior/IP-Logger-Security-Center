@@ -15,6 +15,7 @@ interface Provider {
   lastCheckedAt?: string | null;
   cacheTtlHours?: number;
   count?: number;
+  attribution?: string | null;
   fetchedAt?: string;
   updatedAt?: string | null;
   cityUpdatedAt?: string | null;
@@ -93,7 +94,9 @@ export function SettingsPage() {
             </table>
           </div>
         )}
-        <p className="mt-3 text-xs" style={{ color: 'var(--muted)' }}>Este produto inclui dados GeoLite2 criados pela MaxMind (https://www.maxmind.com), quando habilitado. “Sem resultado” e “não consultado” não significam que um endereço seja seguro.</p>
+        <p className="mt-3 text-xs" style={{ color: 'var(--muted)' }}>
+          {integ.data?.providers.find((p) => p.source === 'geolite2')?.attribution ?? 'Geolocalização local: habilite GEOLITE2_ENABLED e instale uma base (GeoLite2 ou DB-IP Lite).'} “Sem resultado” e “não consultado” não significam que um endereço seja seguro.
+        </p>
       </Card>
 
       <Card title="Privacidade, retenção e regras de risco" className="mt-4">

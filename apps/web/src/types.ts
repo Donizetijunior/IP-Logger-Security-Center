@@ -145,6 +145,7 @@ export interface Me {
 }
 
 export interface PublicConfig {
+  geoAttribution?: string | null;
   signupMode: 'open' | 'approval' | 'closed';
   openSourceUrl: string;
   shortBaseUrl: string;
