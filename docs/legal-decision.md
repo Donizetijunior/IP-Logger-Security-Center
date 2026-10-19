@@ -4,8 +4,8 @@
 
 - **Data do registro:** 2026-10-19
 - **Serviço:** IP Logger Security Center (`iplogger.com.br` / `painel.iplogger.com.br`)
-- **Operador/controlador:** _[nome completo do operador — preencher]_
-- **Canal do titular de dados:** _[e-mail de contato — preencher]_ (também exibido em `/privacy`)
+- **Operador/controlador:** pessoa física, identificada como "Operador do serviço (pessoa física)" no aviso público; a identificação civil completa é mantida pelo operador e **não é versionada neste repositório**
+- **Canal do titular de dados:** `contato@iplogger.com.br` (encaminhamento para o operador; exibido em `/privacy`)
 
 ## 1. Fatos declarados pelo operador
 
@@ -43,6 +43,8 @@ Se uma condição ocorrer: desligar `LEGAL_REVIEW_ACKNOWLEDGED`, reavaliar com a
 
 **LIA resumida:** (i) interesse legítimo — proteger o serviço e permitir investigação de segurança autorizada; (ii) necessidade — o IP é indispensável para a finalidade e nada além do necessário é coletado; (iii) balanceamento — expectativa do titular é limitada (não há aviso no ato do clique), o que **aumenta o risco**; mitigado por: retenção curta, proibições nos Termos, denúncia/moderação, ausência de cruzamento de dados entre contas, IP mascarado em exportações por padrão. **Risco residual reconhecido:** uso indevido por usuários para rastrear pessoas sem consentimento; controles em [multiuser.md](multiuser.md).
 
+**Observação sobre a identificação:** o código-fonte é aberto e não tem "responsável", mas o **serviço hospedado** tem um operador. A LGPD (art. 9º) pede identificação do controlador e canal de contato; a opção de divulgar apenas "pessoa física" + e-mail do projeto é mais frágil do que divulgar o nome e deve ser validada por advogado.
+
 ## 4. Pontos que continuam em aberto (não impedem o registro, mas devem ser tratados)
 
 - Revisão do texto de `/privacy` e dos Termos por advogado.
@@ -56,6 +58,6 @@ Se uma condição ocorrer: desligar `LEGAL_REVIEW_ACKNOWLEDGED`, reavaliar com a
 | | |
 |---|---|
 | Decisão | Go-live autorizado pelo operador com base nos fatos da seção 1 |
-| Responsável | _[nome do operador]_ |
+| Responsável | Operador do serviço (pessoa física) |
 | Data | 2026-10-19 |
 | Revisão obrigatória em | 6 meses, ou antes se ocorrer uma condição da seção 2 |
