@@ -27,6 +27,10 @@ Logs são JSON em stdout com rotação (`json-file`, 10 MB × 5). **Não contêm
 - **Restauração**: `BACKUP_KEY_FILE=… ./infra/scripts/restore.sh <arquivo.dump.enc>`. Verifica o hash, **para api/worker/caddy**, restaura, **executa o expurgo de retenção antes de reabrir as consultas** (CA-18) e só então sobe os serviços.
 - Os scripts leem o `.env` sem executá-lo (valores com espaços/parênteses são válidos para o Docker e quebrariam um `source`).
 
+## Reprocessar eventos (ex.: depois de instalar a geolocalização)
+
+Eventos antigos não ganham local sozinhos. Para reenfileirar os dos últimos 30 dias que ainda estão sem país: `docker compose exec -T postgres psql -U iplogger -d iplogger -c "insert into outbox_events (aggregate_id, type) select id, 'access_event.enrich' from access_events where country is null and occurred_at > now() - interval '30 days'"`. O worker processa em segundos e o resultado é idempotente.
+
 ## Expurgo (retenção de 30 dias)
 
 Roda no worker diariamente (e na inicialização se a última execução passou de 23 h), em lotes de 5000. Remove: eventos > 30 dias e suas avaliações; alertas com IP; cache de inteligência vencido ou sem evento associado ao IP; exportações expiradas; outbox publicada > 7 dias; desafios/sessões vencidos; auditoria > `AUDIT_RETENTION_DAYS`. Execução manual: `docker compose run --rm --no-deps worker node apps/worker/src/cli/purge.ts`. Último resultado no painel.

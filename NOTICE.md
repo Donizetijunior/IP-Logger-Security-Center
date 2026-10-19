@@ -2,6 +2,10 @@
 
 **Licença do projeto:** não definida (`UNLICENSED` no `package.json`) — o proprietário deve escolher uma licença antes de distribuir o código.
 
+## DB-IP Lite
+
+A geolocalização pode usar as bases gratuitas **DB-IP Lite** (https://db-ip.com), licenciadas sob **Creative Commons Attribution 4.0 (CC BY 4.0)**. Atribuição: *IP Geolocation by DB-IP* — exibida pela aplicação. As bases não são distribuídas neste repositório (são baixadas por `infra/scripts/update-geoip.sh`).
+
 ## MaxMind GeoLite2
 
 Este produto inclui dados GeoLite2 criados pela MaxMind, disponíveis em https://www.maxmind.com. O uso das bases está sujeito ao EULA da MaxMind (https://www.maxmind.com/en/geolite/eula), inclusive a obrigação de atualização e de atribuição. As bases **não** são distribuídas neste repositório.

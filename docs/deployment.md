@@ -39,13 +39,20 @@ docker compose run --rm api node apps/api/src/cli/bootstrap-admin.ts
 
 O comando pede e-mail e senha (≥ 12 caracteres, 3 classes de caracteres), cria **a única conta ativa**, e imprime **uma única vez** o segredo/URI TOTP e 10 códigos de recuperação. Cadastre o TOTP no autenticador e guarde os códigos. O MFA é confirmado no primeiro login. Não existe cadastro remoto; um segundo admin ativo é recusado pelo banco.
 
-## 4. GeoLite2 (opcional)
+## 4. Geolocalização local (campo "Local estimado")
 
+Sem uma base instalada o painel mostra "—" em *Local (estimado)*. Há duas opções (o código aceita ambas e prefere a GeoLite2 se as duas existirem). Em qualquer caso defina `GEOLITE2_ENABLED=true` no `.env` (o nome é histórico: vale para qualquer base MMDB) e rode `docker compose --profile tunnel up -d api worker` (ou sem o perfil, se não usa túnel).
+
+**Opção A — DB-IP Lite (gratuita, sem cadastro, recomendada para começar)**
+1. `./infra/scripts/update-geoip.sh` baixa a base de **cidade** (~127 MB) e a de **ASN** (~10 MB) para o volume `iplogger_geoip`, valida o tamanho e substitui de forma atômica.
+2. Agende a atualização mensal (as bases são publicadas todo mês): `0 4 3 * * cd ~/iplogger && bash infra/scripts/update-geoip.sh >> ~/iplogger-backups/geoip.log 2>&1`.
+3. Licença **CC BY 4.0**: a atribuição *IP Geolocation by DB-IP* é exibida automaticamente no rodapé, em `/privacy` e nas configurações.
+
+**Opção B — MaxMind GeoLite2 (exige conta)**
 1. Crie conta MaxMind, aceite o EULA e gere `MAXMIND_ACCOUNT_ID`/`MAXMIND_LICENSE_KEY`.
-2. `GEOLITE2_ENABLED=true` no `.env`, depois `docker compose --profile geoip up -d geoipupdate worker`.
-3. O worker recarrega as bases a cada hora (mantém a anterior se a nova for inválida). Estado em *Configurações e saúde*.
+2. `docker compose --profile geoip up -d geoipupdate worker`. A atribuição da MaxMind é exibida no lugar da do DB-IP.
 
-Atribuição obrigatória: *Este produto inclui dados GeoLite2 criados pela MaxMind (https://www.maxmind.com)* — já exibida no painel e em [NOTICE.md](../NOTICE.md).
+O worker recarrega as bases a cada hora (mantém a anterior se a nova for inválida) e o estado aparece em *Configurações e saúde*. A geolocalização é **aproximada** (nível de cidade, às vezes de bairro) e refere-se ao endereço de rede, não à pessoa. Eventos já registrados só ganham local ao serem reprocessados (ver [operations.md](operations.md)). O worker usa ~170 MB de RAM com a base de cidade carregada.
 
 ## 5. Verificação
 
