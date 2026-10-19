@@ -40,7 +40,10 @@
 }
 
 # ----- Domínio dos links curtos (redirecionamento imediato) -----
-{$LINKS_SITE} {
+# ":80" é o site coringa: domínios personalizados dos usuários chegam pelo túnel com o próprio Host.
+# O Caddy só repassa; quem decide se o Host é um domínio ATIVO é a API (421 para qualquer outro).
+# Os sites nomeados (links e painel) continuam tendo precedência sobre este coringa.
+{$LINKS_SITE}, :80 {
 	import security_headers
 	header Strict-Transport-Security "max-age=31536000"
 	request_body {

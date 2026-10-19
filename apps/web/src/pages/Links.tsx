@@ -17,7 +17,7 @@ function toIsoOrNull(local: string): string | null {
 }
 
 export function LinksPage() {
-  const { me } = useSession();
+  const { me, config } = useSession();
   const [items, setItems] = useState<Link[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [q, setQ] = useState('');
@@ -26,6 +26,14 @@ export function LinksPage() {
   const [formError, setFormError] = useState<unknown>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [editing, setEditing] = useState<Link | null>(null);
+
+  const [domains, setDomains] = useState<Array<{ id: string; hostname: string }>>([]);
+  const [domainId, setDomainId] = useState('');
+  useEffect(() => {
+    api.get<{ items: Array<{ id: string; hostname: string; status: string }> }>('/domains')
+      .then((r) => setDomains(r.items.filter((d) => d.status === 'active')))
+      .catch(() => undefined);
+  }, []);
 
   const [targetUrl, setTargetUrl] = useState('');
   const [slug, setSlug] = useState('');
@@ -55,7 +63,7 @@ export function LinksPage() {
     e.preventDefault();
     setFormError(null);
     try {
-      await api.post('/links', { targetUrl, slug: slug || undefined, label: label || null, expiresAt: toIsoOrNull(expiresAt) });
+      await api.post('/links', { targetUrl, slug: slug || undefined, label: label || null, expiresAt: toIsoOrNull(expiresAt), domainId: domainId || undefined });
       setTargetUrl(''); setSlug(''); setLabel(''); setExpiresAt('');
       await load(true);
     } catch (err) {
@@ -102,6 +110,14 @@ export function LinksPage() {
           <Field label="Validade (opcional)">
             <input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="w-full" />
           </Field>
+          {domains.length > 0 && (
+            <Field label="Domínio do link" className="md:col-span-2 lg:col-span-4">
+              <select value={domainId} onChange={(e) => setDomainId(e.target.value)} className="w-full">
+                <option value="">Domínio principal ({config?.shortBaseUrl.replace(/^https?:\/\//, '')})</option>
+                {domains.map((d) => <option key={d.id} value={d.id}>{d.hostname}</option>)}
+              </select>
+            </Field>
+          )}
           <Field label="Rótulo / finalidade" className="md:col-span-2 lg:col-span-3">
             <input value={label} maxLength={200} onChange={(e) => setLabel(e.target.value)} placeholder="Ex.: monitoramento de campanha autorizada" className="w-full" />
           </Field>

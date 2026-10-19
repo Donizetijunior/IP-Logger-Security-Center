@@ -6,6 +6,7 @@ import type { Telemetry } from './telemetry.ts';
 import type { RdapClient } from './rdap.ts';
 import type { GeoLookup } from './tools/geo.ts';
 import type { Hop } from './tools/safe-http.ts';
+import type { DomainRegistry, ResolveTxt } from './domains.ts';
 
 export interface Ctx {
   config: AppConfig;
@@ -15,6 +16,9 @@ export interface Ctx {
   auth: AuthService;
   rdap: RdapClient;
   geo: GeoLookup;
+  domains: DomainRegistry;
+  /** Consulta de TXT para verificar a propriedade de domínios; substituível em testes. */
+  resolveTxt: ResolveTxt;
   /** Transporte HTTP seguro (anti-SSRF) usado pelas ferramentas; substituível em testes. */
   hop: Hop;
   encKey: Buffer;

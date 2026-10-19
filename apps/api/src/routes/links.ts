@@ -10,6 +10,8 @@ const createBody = z.object({
   label: z.string().max(200).nullish(),
   targetUrl: z.string().max(2048),
   expiresAt: z.string().datetime().nullish(),
+  /** Domínio personalizado (ativo) onde o link vai responder; vazio = domínio principal. */
+  domainId: z.string().uuid().nullish(),
 });
 const patchBody = z.object({
   label: z.string().max(200).nullable().optional(),
@@ -28,7 +30,7 @@ const listQuery = z.object({
 interface LinkRow {
   id: string; slug: string; target_url: string; label: string | null; is_active: boolean;
   expires_at: Date | null; created_at: Date; updated_at: Date; deleted_at: Date | null; owner_id: string;
-  owner_email?: string;
+  owner_email?: string; domain_id: string | null; domain_hostname?: string | null;
   total?: number; uniques?: number; last_access?: Date | null;
 }
 
@@ -38,7 +40,10 @@ export function registerLinks(app: FastifyInstance, ctx: Ctx): void {
   const toDto = (r: LinkRow, showOwner: boolean) => ({
     id: r.id,
     slug: r.slug,
-    publicUrl: `${config.PUBLIC_SHORT_BASE_URL.replace(/\/$/, '')}/${r.slug}`,
+    publicUrl: r.domain_hostname
+      ? `${new URL(config.PUBLIC_SHORT_BASE_URL).protocol}//${r.domain_hostname}/${r.slug}`
+      : `${config.PUBLIC_SHORT_BASE_URL.replace(/\/$/, '')}/${r.slug}`,
+    domain: r.domain_id ? { id: r.domain_id, hostname: r.domain_hostname ?? null } : null,
     targetUrl: r.target_url,
     label: r.label,
     isActive: r.is_active,
@@ -50,6 +55,13 @@ export function registerLinks(app: FastifyInstance, ctx: Ctx): void {
     metrics: r.total === undefined ? undefined : { requests: r.total, uniqueIps: r.uniques ?? 0, lastAccessAt: iso(r.last_access) },
   });
 
+  /** Completa o hostname do domínio em respostas de INSERT/UPDATE ... RETURNING *. */
+  const withHostname = async (r: LinkRow): Promise<LinkRow> => {
+    if (!r.domain_id) return r;
+    const d = await pool.query<{ hostname: string }>('SELECT hostname FROM custom_domains WHERE id = $1', [r.domain_id]);
+    return { ...r, domain_hostname: d.rows[0]?.hostname ?? null };
+  };
+
   app.post('/links', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req, reply) => {
     const session = req.session!;
     const body = createBody.parse(req.body);
@@ -57,8 +69,17 @@ export function registerLinks(app: FastifyInstance, ctx: Ctx): void {
     if (!target.ok) throw new HttpError(400, 'invalid_target', target.reason ?? 'Destino inválido');
     // Destinos que apontam de volta para os próprios domínios criariam laços de redirecionamento
     const targetHost = new URL(target.url!).host.toLowerCase();
-    if (targetHost === config.shortHost || targetHost === config.dashboardHost) {
+    if (targetHost === config.shortHost || targetHost === config.dashboardHost || ctx.domains.byHost(targetHost)) {
       throw new HttpError(400, 'invalid_target', 'O destino não pode ser um domínio deste serviço');
+    }
+    let domainId: string | null = null;
+    if (body.domainId) {
+      const d = await pool.query<{ id: string }>(
+        "SELECT id FROM custom_domains WHERE id = $1 AND status = 'active' AND (owner_id = $2 OR $3::boolean)",
+        [body.domainId, session.accountId, session.role === 'admin'],
+      );
+      if (!d.rows[0]) throw new HttpError(400, 'invalid_domain', 'Domínio inexistente, não verificado/ativo ou de outra conta');
+      domainId = d.rows[0].id;
     }
     let slug = body.slug;
     if (slug !== undefined && !isValidSlug(slug)) {
@@ -79,10 +100,10 @@ export function registerLinks(app: FastifyInstance, ctx: Ctx): void {
       if (!isValidSlug(candidate)) continue;
       try {
         const { rows } = await pool.query<LinkRow>(
-          `INSERT INTO short_links (slug, target_url, label, expires_at, owner_id) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-          [candidate, target.url, body.label ?? null, body.expiresAt ?? null, session.accountId],
+          `INSERT INTO short_links (slug, target_url, label, expires_at, owner_id, domain_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+          [candidate, target.url, body.label ?? null, body.expiresAt ?? null, session.accountId, domainId],
         );
-        const row = rows[0]!;
+        const row = await withHostname(rows[0]!);
         linkCache.invalidate(row.slug);
         await audit(pool, { accountId: session.accountId, action: 'link.create', resource: `link:${row.id}`, result: 'success', metadata: { slug: row.slug } });
         return reply.code(201).send(toDto(row, false));
@@ -119,11 +140,12 @@ export function registerLinks(app: FastifyInstance, ctx: Ctx): void {
     }
     params.push(q.limit + 1);
     const { rows } = await pool.query<LinkRow & { created_raw: string }>(
-      `SELECT l.*, a.email AS owner_email,
+      `SELECT l.*, a.email AS owner_email, cd.hostname AS domain_hostname,
          to_char(l.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_raw,
          COALESCE(s.total, 0)::int AS total, COALESCE(s.uniques, 0)::int AS uniques, s.last_access
        FROM short_links l
        JOIN accounts a ON a.id = l.owner_id
+       LEFT JOIN custom_domains cd ON cd.id = l.domain_id
        LEFT JOIN LATERAL (
          SELECT count(*) AS total, count(DISTINCT ip_address) AS uniques, max(occurred_at) AS last_access
          FROM access_events e WHERE e.short_link_id = l.id
@@ -145,8 +167,9 @@ export function registerLinks(app: FastifyInstance, ctx: Ctx): void {
     const { id } = idParam.parse(req.params);
     const owner = ownerScope(req);
     const { rows } = await pool.query<LinkRow>(
-      `SELECT l.*, a.email AS owner_email, COALESCE(s.total, 0)::int AS total, COALESCE(s.uniques, 0)::int AS uniques, s.last_access
+      `SELECT l.*, a.email AS owner_email, cd.hostname AS domain_hostname, COALESCE(s.total, 0)::int AS total, COALESCE(s.uniques, 0)::int AS uniques, s.last_access
        FROM short_links l JOIN accounts a ON a.id = l.owner_id
+       LEFT JOIN custom_domains cd ON cd.id = l.domain_id
        LEFT JOIN LATERAL (SELECT count(*) AS total, count(DISTINCT ip_address) AS uniques, max(occurred_at) AS last_access
                           FROM access_events e WHERE e.short_link_id = l.id) s ON true
        WHERE l.id = $1 AND l.deleted_at IS NULL AND ($2::uuid IS NULL OR l.owner_id = $2)`,
@@ -195,7 +218,7 @@ export function registerLinks(app: FastifyInstance, ctx: Ctx): void {
     }
     linkCache.invalidate(row.slug);
     await audit(pool, { accountId: req.session!.accountId, action: 'link.update', resource: `link:${id}`, result: 'success', metadata: { fields: Object.keys(body) } });
-    return toDto(row, false);
+    return toDto(await withHostname(row), false);
   });
 
   app.delete('/links/:id', async (req) => {

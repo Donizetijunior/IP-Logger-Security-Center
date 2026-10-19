@@ -4,6 +4,7 @@ import { isValidSlug, sanitizeText } from '@ipl/shared';
 import { EMAIL_REGEX, hashPassword, validatePasswordStrength } from '../auth.ts';
 import { audit } from '../audit.ts';
 import type { Ctx } from '../context.ts';
+import { stripPort } from '../domains.ts';
 import { HttpError } from '../util.ts';
 
 const signupBody = z.object({
@@ -88,13 +89,28 @@ export function registerPublicAccount(app: FastifyInstance, ctx: Ctx, checkOrigi
     checkOrigin(req);
     const body = abuseBody.parse(req.body);
     // Aceita o slug ou a URL curta completa
+    // Com URL completa, o domínio importa: o mesmo código pode existir em domínios diferentes
     const raw = body.slug.trim();
-    const slug = raw.includes('/') ? (raw.split('/').filter(Boolean).pop() ?? '') : raw;
+    let slug = raw;
+    let host: string | null = null;
+    if (raw.includes('/')) {
+      try {
+        const u = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`);
+        host = stripPort(u.host);
+        slug = u.pathname.split('/').filter(Boolean)[0] ?? '';
+      } catch {
+        slug = '';
+      }
+    }
     if (!isValidSlug(slug)) throw new HttpError(400, 'invalid_slug', 'Informe o código do link (a parte depois da barra)');
-    const { rows } = await pool.query<{ id: string }>('SELECT id FROM short_links WHERE slug = $1 AND deleted_at IS NULL', [slug]);
+    const custom = host && host !== stripPort(config.shortHost) ? ctx.domains.byHost(host) : undefined;
+    const { rows } = await pool.query<{ id: string }>(
+      'SELECT id FROM short_links WHERE slug = $1 AND domain_id IS NOT DISTINCT FROM $2::uuid AND deleted_at IS NULL',
+      [slug, custom?.id ?? null],
+    );
     await pool.query(
       'INSERT INTO abuse_reports (slug, link_id, reason, details, contact) VALUES ($1, $2, $3, $4, $5)',
-      [slug, rows[0]?.id ?? null, body.reason, sanitizeText(body.details, 2000), sanitizeText(body.contact, 200)],
+      [custom ? `${custom.hostname}/${slug}` : slug, rows[0]?.id ?? null, body.reason, sanitizeText(body.details, 2000), sanitizeText(body.contact, 200)],
     );
     return reply.code(201).send({ ok: true });
   });

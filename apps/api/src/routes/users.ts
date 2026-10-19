@@ -149,6 +149,9 @@ export function registerUsers(app: FastifyInstance, ctx: Ctx): void {
           'UPDATE short_links SET is_active = false, moderation_disabled = true, updated_at = now() WHERE owner_id = $1 AND is_active RETURNING slug', [id],
         );
         for (const r of rows) linkCache.invalidate(r.slug);
+        // Domínios personalizados da conta suspensa também deixam de responder (o admin reativa se for o caso)
+        await pool.query("UPDATE custom_domains SET status = 'disabled' WHERE owner_id = $1 AND status <> 'disabled'", [id]);
+        await ctx.domains.refresh();
       }
     }
     await audit(pool, { accountId: req.session!.accountId, action: 'user.update', resource: `user:${id}`, result: 'success', metadata: body });

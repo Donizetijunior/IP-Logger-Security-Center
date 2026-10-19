@@ -8,6 +8,7 @@ import { AbusePage } from './pages/Abuse';
 import { AccountPage } from './pages/Account';
 import { AlertsPage } from './pages/Alerts';
 import { EventDetailPage } from './pages/EventDetail';
+import { DomainsPage } from './pages/Domains';
 import { EventsPage } from './pages/Events';
 import { IpPage } from './pages/Ip';
 import { LinksPage } from './pages/Links';
@@ -24,6 +25,7 @@ import { UsersPage } from './pages/Users';
 const NAV_USER = [
   { to: '/', label: 'Visão geral', end: true },
   { to: '/links', label: 'Links' },
+  { to: '/dominios', label: 'Domínios' },
   { to: '/eventos', label: 'Eventos' },
   { to: '/alertas', label: 'Alertas' },
   { to: '/ferramentas', label: 'Ferramentas' },
@@ -32,6 +34,7 @@ const NAV_USER = [
 const NAV_ADMIN = [
   { to: '/', label: 'Visão geral', end: true },
   { to: '/links', label: 'Links' },
+  { to: '/dominios', label: 'Domínios' },
   { to: '/eventos', label: 'Eventos' },
   { to: '/alertas', label: 'Alertas' },
   { to: '/ferramentas', label: 'Ferramentas' },
@@ -169,6 +172,7 @@ export function App() {
           <Routes>
             <Route path="/" element={<OverviewPage />} />
             <Route path="/links" element={<LinksPage />} />
+            <Route path="/dominios" element={<DomainsPage />} />
             <Route path="/eventos" element={<EventsPage />} />
             <Route path="/eventos/:id" element={<EventDetailPage />} />
             <Route path="/ips/:ip" element={<IpPage />} />

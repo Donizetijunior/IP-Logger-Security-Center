@@ -78,7 +78,9 @@ export function registerReports(app: FastifyInstance, ctx: Ctx): void {
         await auth.revokeAllSessions(u.id);
         const s = await pool.query<{ slug: string }>('UPDATE short_links SET is_active = false, moderation_disabled = true, updated_at = now() WHERE owner_id = $1 AND is_active RETURNING slug', [u.id]);
         for (const r of s.rows) linkCache.invalidate(r.slug);
+        await pool.query("UPDATE custom_domains SET status = 'disabled' WHERE owner_id = $1 AND status <> 'disabled'", [u.id]);
       }
+      await ctx.domains.refresh();
     }
     await audit(pool, { accountId: req.session!.accountId, action: 'report.update', resource: `report:${id}`, result: 'success', metadata: body });
     return { ok: true };

@@ -5,10 +5,11 @@ import type { Ctx } from './context.ts';
 import { LinkCache } from './link-cache.ts';
 import { DisabledRdapClient, HttpRdapClient } from './rdap.ts';
 import { Telemetry } from './telemetry.ts';
+import { DomainRegistry, defaultResolveTxt, type ResolveTxt } from './domains.ts';
 import { GeoLookup } from './tools/geo.ts';
 import { safeHop, type Hop } from './tools/safe-http.ts';
 
-export function createContext(env: NodeJS.ProcessEnv = process.env, overrides: Partial<Pick<Ctx, 'rdap'>> & { hop?: Hop } = {}): Ctx {
+export function createContext(env: NodeJS.ProcessEnv = process.env, overrides: Partial<Pick<Ctx, 'rdap'>> & { hop?: Hop; resolveTxt?: ResolveTxt } = {}): Ctx {
   const config = loadConfig(env);
   const encKey = parseEncryptionKey(config.TOTP_ENCRYPTION_KEY);
   const pool = createPool(config.DATABASE_URL, { max: 15 });
@@ -22,5 +23,7 @@ export function createContext(env: NodeJS.ProcessEnv = process.env, overrides: P
     rdap: overrides.rdap ?? (config.RDAP_ENABLED ? new HttpRdapClient() : new DisabledRdapClient()),
     geo: new GeoLookup(config.GEOIP_DIR, config.GEOLITE2_ENABLED),
     hop: overrides.hop ?? safeHop,
+    domains: new DomainRegistry(pool),
+    resolveTxt: overrides.resolveTxt ?? defaultResolveTxt(),
   };
 }

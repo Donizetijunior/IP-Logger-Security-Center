@@ -41,15 +41,21 @@ export function registerRedirect(app: FastifyInstance, ctx: Ctx): void {
       const started = performance.now();
       const notFound = () => reply.code(404).header('cache-control', 'no-store').send({ error: { code: 'not_found', message: 'Não encontrado' } });
 
+      // Domínio principal (domainId = null) ou domínio personalizado ATIVO. Um link só responde no domínio a que pertence.
       const host = (req.headers.host ?? '').toLowerCase();
-      if (host !== config.shortHost) return notFound();
+      let domainId: string | null = null;
+      if (host !== config.shortHost) {
+        const custom = ctx.domains.byHost(host);
+        if (!custom || custom.status !== 'active') return notFound();
+        domainId = custom.id;
+      }
 
       const slug = req.params.slug;
       if (!isValidSlug(slug)) return notFound();
 
       let lookup;
       try {
-        lookup = await linkCache.get(slug);
+        lookup = await linkCache.get(slug, domainId);
       } catch {
         telemetry.increment('redirect_lookup_failed');
         return reply.code(503).header('cache-control', 'no-store').header('retry-after', '5').send({ error: { code: 'unavailable', message: 'Serviço temporariamente indisponível' } });
