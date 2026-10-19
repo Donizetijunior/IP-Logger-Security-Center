@@ -20,6 +20,7 @@ Preencha no `.env`:
 |---|---|
 | `LINKS_SITE`, `PANEL_SITE` | Nomes de domínio (o Caddy emite/renova TLS Let's Encrypt automaticamente). |
 | `LANDING_HOST` | Opcional. Host (sem `http://`, ex.: `iplogger.com.br`) cuja raiz `/` exibe a página de apresentação (`apps/web/public/landing`). Vazio = a raiz segue a regra da API. |
+| `CUSTOM_DOMAINS_EMAILS` | Opcional. E-mails (vírgula) que podem usar domínios personalizados; as outras contas não veem o recurso. Vazio = vale `CUSTOM_DOMAINS_MODE` para todos. |
 | `PUBLIC_SHORT_BASE_URL`, `PUBLIC_DASHBOARD_URL` | URLs `https://…` correspondentes (a API valida o cabeçalho `Host` contra elas). |
 | `ACME_EMAIL` | E-mail para o Let's Encrypt. |
 | `POSTGRES_PASSWORD`, `REDIS_PASSWORD` | Gere com `openssl rand -base64 36`. |

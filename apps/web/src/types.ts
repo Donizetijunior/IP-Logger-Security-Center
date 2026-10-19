@@ -166,6 +166,7 @@ export interface Me {
   email: string;
   role: Role;
   mustChangePassword: boolean;
+  customDomains?: boolean;
   linkQuota?: number;
 }
 

@@ -67,6 +67,8 @@ const schema = z.object({
   /** Quem pode cadastrar domínios personalizados: admin = só o administrador; approval = usuários pedem e o admin aprova; open = usuários verificados ativam sozinhos. */
   CUSTOM_DOMAINS_MODE: z.enum(['admin', 'approval', 'open']).default('admin'),
   CUSTOM_DOMAINS_MAX_PER_USER: int(3),
+  /** Lista (separada por vírgula) de e-mails que podem usar domínios personalizados. Vazia = segue CUSTOM_DOMAINS_MODE para todos. */
+  CUSTOM_DOMAINS_EMAILS: z.string().default(''),
   /** Apenas exibido nas instruções do painel (URL do serviço na rota do túnel). */
   TUNNEL_SERVICE_URL: z.string().default('http://caddy:80'),
   DEFAULT_LINK_QUOTA: int(25),
@@ -80,6 +82,7 @@ export type AppConfig = z.infer<typeof schema> & {
   shortHost: string;
   dashboardHost: string;
   allowedDomains: string[];
+  customDomainsEmails: string[];
   cookieSecure: boolean;
 };
 
@@ -113,6 +116,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     shortHost: new URL(c.PUBLIC_SHORT_BASE_URL).host.toLowerCase(),
     dashboardHost: new URL(c.PUBLIC_DASHBOARD_URL).host.toLowerCase(),
     allowedDomains: c.ALLOWED_TARGET_DOMAINS.split(',').map((s) => s.trim()).filter(Boolean),
+    customDomainsEmails: c.CUSTOM_DOMAINS_EMAILS.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
     cookieSecure: c.COOKIE_SECURE ?? c.NODE_ENV === 'production',
   };
 }
