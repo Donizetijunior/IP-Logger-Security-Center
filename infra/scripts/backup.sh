@@ -14,8 +14,10 @@ BACKUP_MIN_FREE_GB="${BACKUP_MIN_FREE_GB:-5}"
 : "${BACKUP_KEY_FILE:?defina BACKUP_KEY_FILE (arquivo com a senha de criptografia)}"
 [ -r "$BACKUP_KEY_FILE" ] || { echo "BACKUP_KEY_FILE ilegível" >&2; exit 1; }
 
-# shellcheck disable=SC1091
-set -a; [ -f .env ] && . ./.env; set +a
+# Lê variáveis do .env SEM executá-lo (valores com espaços/parênteses valem para o Docker, mas quebram o shell)
+envval() { [ -f .env ] && grep -E "^$1=" .env | tail -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' || true; }
+POSTGRES_USER="${POSTGRES_USER:-$(envval POSTGRES_USER)}"
+POSTGRES_DB="${POSTGRES_DB:-$(envval POSTGRES_DB)}"
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 
