@@ -27,6 +27,8 @@ services:
       TUNNEL_IP: ${IPLC_TUNNEL_IP:-172.30.0.249}
       LINKS_SITE: ${LINKS_SITE:?defina LINKS_SITE}
       PANEL_SITE: ${PANEL_SITE:?defina PANEL_SITE}
+      # Opcional: nome do host (sem http://) cuja raiz exibe a página de apresentação; vazio = sem landing
+      LANDING_HOST: ${LANDING_HOST:-landing.invalid}
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
