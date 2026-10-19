@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const DIR = new URL('../../infra/scripts/', import.meta.url);
@@ -9,7 +10,7 @@ const files = readdirSync(DIR).filter((f) => f.endsWith('.sh'));
 
 describe('scripts de operação (infra/scripts)', () => {
   it.each(files)('%s tem sintaxe válida de bash', (f) => {
-    execFileSync('bash', ['-n', new URL(f, DIR).pathname.replace(/^\/([A-Za-z]:)/, '$1')]);
+    execFileSync('bash', ['-n', f], { cwd: fileURLToPath(DIR) });
   });
 
   it('nenhum script executa o .env como código (valores com espaço/parênteses quebrariam o shell)', () => {
