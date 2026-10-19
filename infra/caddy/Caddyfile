@@ -55,6 +55,27 @@
 		respond 404
 	}
 
+	# Página de apresentação na raiz do domínio principal (arquivo estático do contêiner web).
+	# Domínios personalizados (curinga :80) NÃO passam por aqui: a raiz deles segue a regra da API.
+	@landing {
+		host {$LINKS_SITE}
+		path /
+	}
+	handle @landing {
+		header -X-Robots-Tag
+		header Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+		header Cache-Control "public, max-age=300"
+		rewrite * /landing/index.html
+		reverse_proxy web:8080
+	}
+	@robots {
+		host {$LINKS_SITE}
+		path /robots.txt
+	}
+	handle @robots {
+		respond "User-agent: *\nAllow: /$\nDisallow: /\n" 200
+	}
+
 	handle {
 		import api_proxy
 	}
