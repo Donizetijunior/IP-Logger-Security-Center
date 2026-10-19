@@ -10,9 +10,12 @@
 		-Server
 		X-Content-Type-Options nosniff
 		Referrer-Policy no-referrer
-		X-Robots-Tag "noindex, nofollow"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
 	}
+}
+
+(noindex) {
+	header X-Robots-Tag "noindex, nofollow"
 }
 
 (api_proxy) {
@@ -52,6 +55,7 @@
 	# Apenas rotas públicas: nada de /api, /metrics, /readyz.
 	@blocked path /api/* /metrics /readyz /healthz
 	handle @blocked {
+		import noindex
 		respond 404
 	}
 
@@ -62,7 +66,6 @@
 		path /
 	}
 	handle @landing {
-		header >X-Robots-Tag "index, follow"
 		header Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 		header Cache-Control "public, max-age=300"
 		rewrite * /landing/index.html
@@ -77,6 +80,7 @@
 	}
 
 	handle {
+		import noindex
 		import api_proxy
 	}
 }
@@ -87,6 +91,7 @@
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+		X-Robots-Tag "noindex, nofollow"
 		X-Frame-Options DENY
 		Cross-Origin-Opener-Policy same-origin
 	}
