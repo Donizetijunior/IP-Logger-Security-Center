@@ -99,6 +99,7 @@ E2E_TOTP_SECRET=... E2E_PASSWORD=... npm run test:load
 | Isolamento entre usuários (links, eventos, IPs, painel, alertas, exportações) | ✅ | `multiuser.test.ts` |
 | Cadastro `open`/`approval`/`closed`, termos, senha forte, limite por IP, papel não escalável | ✅ | `multiuser.test.ts` |
 | Cotas, laço de redirect bloqueado, raiz do domínio de links redireciona ao painel | ✅ | `multiuser.test.ts` |
+| Múltiplos administradores: criação com reauth + MFA, auto-proteção, último admin, suspensão/exclusão entre admins | ✅ | `admins.test.ts` |
 | Senha temporária + troca obrigatória + aceite de Termos; reset revoga sessões | ✅ | `multiuser.test.ts` |
 | Suspensão revoga sessões e desativa links; dono não reativa link moderado | ✅ | `multiuser.test.ts` |
 | Exclusão (admin e própria conta) apaga links/eventos/alertas | ✅ | `multiuser.test.ts` |

@@ -19,7 +19,7 @@ Não abra issue pública. Envie os detalhes (passos, impacto, versão) ao respon
 | Vazamento de segredos | Segredos em `.env` (600) ou `*_FILE`; valores `CHANGE_ME` rejeitados em produção; chaves de API e TOTP nunca retornam pela API (testado); segredo TOTP cifrado com AES-256-GCM |
 | Acesso a dados de outro usuário (multi-tenant) | Escopo por dono aplicado no SQL de links, eventos, IPs, painel, alertas e exportações; rotas administrativas exigem papel admin; testes de isolamento (`tests/integration/multiuser.test.ts`) |
 | Cadastro em massa / spam | Limite de cadastros por IP, cota de links por conta, modo `approval`, suspensão e remoção de contas; **sem** verificação de e-mail/CAPTCHA (pendente) |
-| Elevação de privilégio | O papel nunca vem do cliente; índice único garante uma só conta admin; admin só é criado por CLI; conta admin protegida nas rotas de usuários |
+| Elevação de privilégio | O papel nunca vem do cliente; admin só é criado por outro admin (com reautenticação, MFA obrigatório, auditado em `admin.create`) ou pelo CLI de instalação; ninguém altera a própria conta nem remove o último admin ativo |
 | Reativação de link moderado pelo dono | `moderation_disabled` impede reativação por usuários comuns |
 | IP forjado atrás do Cloudflare | `CF-Connecting-IP` só é aceito quando a conexão vem do contêiner do túnel (IP fixo); caso contrário é descartado |
 | Abuso de volume | Rate limit por IP no redirect (generoso, configurável); telemetria de bloqueios sem PII |
