@@ -46,8 +46,13 @@ export async function buildApp(
     if (!internal) {
       const host = (req.headers.host ?? '').toLowerCase();
       if (host !== ctx.config.shortHost && host !== ctx.config.dashboardHost) {
-        reply.code(421).send({ error: { code: 'misdirected_request', message: 'Host não reconhecido' } });
-        return reply;
+        // Domínio personalizado: só ativos; domínios pendentes podem responder apenas à checagem de roteamento
+        const custom = ctx.domains.byHost(host);
+        const routingCheck = path === '/.well-known/iplogger-check';
+        if (!custom || (custom.status !== 'active' && !routingCheck)) {
+          reply.code(421).send({ error: { code: 'misdirected_request', message: 'Host não reconhecido' } });
+          return reply;
+        }
       }
     }
     return undefined;
@@ -111,6 +116,7 @@ export async function buildApp(
     return reply.type('text/plain; version=0.0.4').send(ctx.telemetry.prometheus());
   });
 
+  await ctx.domains.refresh();
   registerPublic(app, ctx);
   await app.register(async (admin) => registerAdmin(admin, ctx), { prefix: '/api/v1' });
   // Rota catch-all /:slug por último

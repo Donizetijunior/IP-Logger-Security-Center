@@ -8,12 +8,14 @@ async function main(): Promise<void> {
   const migrated = await migrate(ctx.pool);
   if (migrated.length) console.log(JSON.stringify({ level: 'info', msg: 'migrations aplicadas', migrated }));
   const app = await buildApp(ctx);
+  ctx.domains.start();
   ctx.telemetry.start(ctx.pool);
   startOpsMonitor(ctx.pool);
 
   const shutdown = async (signal: string) => {
     app.log.info({ signal }, 'encerrando');
     ctx.telemetry.stop();
+    ctx.domains.stop();
     await app.close();
     await ctx.telemetry.flush(ctx.pool);
     await ctx.pool.end();

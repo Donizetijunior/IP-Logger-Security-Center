@@ -7,6 +7,7 @@ import { createContext } from '../../apps/api/src/create-context.ts';
 import type { Ctx } from '../../apps/api/src/context.ts';
 import type { RdapClient } from '../../apps/api/src/rdap.ts';
 import type { Hop } from '../../apps/api/src/tools/safe-http.ts';
+import type { ResolveTxt } from '../../apps/api/src/domains.ts';
 import { parseEncryptionKey } from '@ipl/shared';
 
 export const TEST_DATABASE_URL =
@@ -57,7 +58,7 @@ export interface Session {
 
 export async function startTestApp(
   extraEnv: Record<string, string> = {},
-  overrides: { rdap?: RdapClient; hop?: Hop } = {},
+  overrides: { rdap?: RdapClient; hop?: Hop; resolveTxt?: ResolveTxt } = {},
 ): Promise<TestApp> {
   const ctx = createContext(testEnv(extraEnv), overrides);
   await resetDatabase(ctx.pool);
@@ -68,14 +69,14 @@ export async function startTestApp(
 
   const login = async (): Promise<Session> => {
     const r1 = await app.inject({
-      method: 'POST', url: '/api/v1/auth/login', headers: { host: DASH_HOST }, payload: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
+      method: 'POST', url: '/api/v1/auth/login', headers: { host: ctx.config.dashboardHost }, payload: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
     });
     if (r1.statusCode !== 200) throw new Error(`login falhou: ${r1.statusCode} ${r1.body}`);
     const { challenge } = r1.json() as { challenge: string };
     const code = codes.shift();
     if (!code) throw new Error('sem códigos de recuperação de teste');
     const r2 = await app.inject({
-      method: 'POST', url: '/api/v1/auth/totp/verify', headers: { host: DASH_HOST }, payload: { challenge, code },
+      method: 'POST', url: '/api/v1/auth/totp/verify', headers: { host: ctx.config.dashboardHost }, payload: { challenge, code },
     });
     if (r2.statusCode !== 200) throw new Error(`mfa falhou: ${r2.statusCode} ${r2.body}`);
     const setCookie = r2.cookies[0]!;
@@ -84,7 +85,7 @@ export async function startTestApp(
     return {
       cookie,
       csrf,
-      headers: (extra = {}) => ({ host: DASH_HOST, cookie, 'x-csrf-token': csrf, ...extra }),
+      headers: (extra = {}) => ({ host: ctx.config.dashboardHost, cookie, 'x-csrf-token': csrf, ...extra }),
     };
   };
 
@@ -121,7 +122,7 @@ export const nextIp = () => `198.51.100.${(ipCounter = (ipCounter % 240) + 1)}`;
 
 export async function signup(t: TestApp, email: string, password = USER_PASSWORD, acceptTerms: unknown = true) {
   return t.app.inject({
-    method: 'POST', url: '/api/v1/auth/signup', headers: { host: DASH_HOST }, remoteAddress: nextIp(),
+    method: 'POST', url: '/api/v1/auth/signup', headers: { host: t.ctx.config.dashboardHost }, remoteAddress: nextIp(),
     payload: { email, password, acceptTerms },
   });
 }
@@ -129,13 +130,13 @@ export async function signup(t: TestApp, email: string, password = USER_PASSWORD
 /** Login de conta sem MFA (usuário comum): uma única chamada cria a sessão. */
 export async function loginUser(t: TestApp, email: string, password = USER_PASSWORD): Promise<Session> {
   const r = await t.app.inject({
-    method: 'POST', url: '/api/v1/auth/login', headers: { host: DASH_HOST }, remoteAddress: nextIp(), payload: { email, password },
+    method: 'POST', url: '/api/v1/auth/login', headers: { host: t.ctx.config.dashboardHost }, remoteAddress: nextIp(), payload: { email, password },
   });
   if (r.statusCode !== 200 || r.json().mfaRequired) throw new Error(`login de usuário falhou: ${r.statusCode} ${r.body}`);
   const c = r.cookies[0]!;
   const cookie = `${c.name}=${c.value}`;
   const csrf = r.json().csrfToken as string;
-  return { cookie, csrf, headers: (extra = {}) => ({ host: DASH_HOST, cookie, 'x-csrf-token': csrf, ...extra }) };
+  return { cookie, csrf, headers: (extra = {}) => ({ host: t.ctx.config.dashboardHost, cookie, 'x-csrf-token': csrf, ...extra }) };
 }
 
 export async function visit(t: TestApp, slug: string, ip: string, ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36') {

@@ -21,6 +21,7 @@ tags:
   - { name: Usuários }
   - { name: Moderação }
   - { name: Ferramentas }
+  - { name: Domínios }
   - { name: Público }
 security:
   - sessionCookie: []
@@ -234,6 +235,19 @@ paths:
     get: { tags: [Público], security: [], summary: 'Verifica se a nota existe (não a consome)', parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/Error' } } }
   /public/notes/{id}/read:
     post: { tags: [Público], security: [], summary: 'Lê e DESTRÓI a nota (leitura única e atômica)', parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { description: 'ciphertext + iv' }, '404': { $ref: '#/components/responses/Error' } } }
+  /domains:
+    get: { tags: [Domínios], summary: 'Lista domínios personalizados (usuário vê os seus; admin vê todos) e a política vigente', responses: { '200': { description: OK } } }
+    post:
+      tags: [Domínios]
+      summary: 'Cadastra um domínio (modo admin: só admin). Retorna as instruções de TXT e de roteamento'
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [hostname], properties: { hostname: { type: string }, rootRedirectUrl: { type: [string, 'null'] } } } } } }
+      responses: { '201': { description: Criado }, '400': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+  /domains/{id}/verify:
+    post: { tags: [Domínios], summary: 'Verifica o TXT e a chegada do tráfego (checagem de roteamento)', parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }], responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } } }
+  /domains/{id}:
+    patch: { tags: [Domínios], summary: 'Admin: ativa/desativa (exige propriedade verificada). Dono: redirecionamento da raiz', parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }], requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { status: { type: string, enum: [active, disabled] }, rootRedirectUrl: { type: [string, 'null'] } } } } } }, responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } } }
+    delete: { tags: [Domínios], summary: 'Exclui o domínio (409 enquanto houver links ativos nele)', parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }], responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Error' } } }
 x-public-routes:
   note: Rotas do domínio de links (fora de /api/v1)
   routes:

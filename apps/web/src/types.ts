@@ -11,6 +11,7 @@ export interface Link {
   createdAt: string;
   status: 'active' | 'inactive' | 'expired' | 'deleted';
   owner?: { id: string; email: string | null };
+  domain?: { id: string; hostname: string | null } | null;
   metrics?: { requests: number; uniqueIps: number; lastAccessAt: string | null };
 }
 
@@ -133,6 +134,30 @@ export interface ExportItem {
   maskedIp: boolean;
   createdAt: string;
   expiresAt: string;
+}
+
+export interface DomainItem {
+  id: string;
+  hostname: string;
+  status: 'pending_dns' | 'pending_approval' | 'active' | 'disabled';
+  owner?: { id: string; email: string | null };
+  verifiedAt: string | null;
+  approvedAt: string | null;
+  rootRedirectUrl: string | null;
+  routingOk: boolean | null;
+  lastCheckAt: string | null;
+  lastCheckError: string | null;
+  createdAt: string;
+  links: number;
+  dns: { txtName: string; txtValue: string };
+  routing: { serviceUrl: string; hostname: string };
+}
+
+export interface DomainPolicy {
+  mode: 'admin' | 'approval' | 'open';
+  canCreate: boolean;
+  max: number | null;
+  used: number;
 }
 
 export type Role = 'admin' | 'user';

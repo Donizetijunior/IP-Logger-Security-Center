@@ -71,7 +71,7 @@ export function ReportsPage() {
                   <Badge kind="neutral">{REASON[r.reason] ?? r.reason}</Badge>
                   <span className="text-xs" style={{ color: 'var(--muted)' }}><Time iso={r.createdAt} /></span>
                 </div>
-                <h2 className="mono text-base font-semibold">/{r.slug}</h2>
+                <h2 className="mono text-base font-semibold">{r.slug.includes('/') ? r.slug : `/${r.slug}`}</h2>
                 {r.targetUrl && <p className="break-all text-sm" style={{ color: 'var(--muted)' }}>Destino: {r.targetUrl}</p>}
                 <p className="text-sm">Dono: {r.owner ? <>{r.owner.email} <Badge kind={r.owner.status === 'active' ? 'ok' : 'bad'}>{r.owner.status}</Badge></> : <em>link não encontrado</em>}</p>
                 {r.details && <p className="mt-2 whitespace-pre-wrap text-sm">{r.details}</p>}

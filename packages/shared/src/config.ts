@@ -64,6 +64,11 @@ const schema = z.object({
   COOKIE_SECURE: bool.optional(),
   /** open = cadastro livre; approval = exige aprovação do admin; closed = sem cadastro público. */
   SIGNUP_MODE: z.enum(['open', 'approval', 'closed']).default('approval'),
+  /** Quem pode cadastrar domínios personalizados: admin = só o administrador; approval = usuários pedem e o admin aprova; open = usuários verificados ativam sozinhos. */
+  CUSTOM_DOMAINS_MODE: z.enum(['admin', 'approval', 'open']).default('admin'),
+  CUSTOM_DOMAINS_MAX_PER_USER: int(3),
+  /** Apenas exibido nas instruções do painel (URL do serviço na rota do túnel). */
+  TUNNEL_SERVICE_URL: z.string().default('http://caddy:80'),
   DEFAULT_LINK_QUOTA: int(25),
   SIGNUP_RATE_PER_HOUR: int(5),
   OPEN_SOURCE_URL: z.string().default('https://github.com/Donizetijunior/IP-Logger-Security-Center'),

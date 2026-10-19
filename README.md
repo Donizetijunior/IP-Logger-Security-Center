@@ -12,6 +12,7 @@ Plataforma de links curtos com registro de acessos, enriquecimento assíncrono d
 - Calcula um **risk score explicável e versionado** (regra, peso, valor, fonte, horário) e gera alertas internos (somente no painel).
 - Painel em pt-BR: visão geral, links, eventos com filtros, detalhe do evento, investigação de IP, alertas, saúde das integrações, auditoria.
 - **Ferramentas** para usuários logados (meu IP/UA, consulta de IP, WHOIS/RDAP, fabricante por MAC, verificador de URL com proteção SSRF, notas privadas autodestrutivas, geradores): [docs/tools.md](docs/tools.md).
+- **Domínios personalizados** para os links (verificação por TXT, aprovação e checagem de roteamento): [docs/custom-domains.md](docs/custom-domains.md).
 - **Contas:** cadastro público, Termos de Uso, troca/exclusão de conta, gestão de usuários pelo admin, cotas por conta e **denúncia pública de abuso** com moderação.
 - Exporta CSV/JSON com reautenticação, IP mascarado por padrão, TTL curto e auditoria.
 - Expurga automaticamente eventos identificáveis após **30 dias**.
