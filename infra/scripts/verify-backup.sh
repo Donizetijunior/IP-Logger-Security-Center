@@ -11,7 +11,10 @@ BACKUP_DIR="${BACKUP_DIR:-./backups}"
 file="${1:-$(ls -1t "$BACKUP_DIR"/iplogger-*.dump.enc 2>/dev/null | head -1)}"
 [ -n "$file" ] && [ -r "$file" ] || { echo "nenhum backup encontrado" >&2; exit 1; }
 
-set -a; [ -f .env ] && . ./.env; set +a
+# Lê variáveis do .env SEM executá-lo (valores com espaços/parênteses valem para o Docker, mas quebram o shell)
+envval() { [ -f .env ] && grep -E "^$1=" .env | tail -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' || true; }
+POSTGRES_USER="${POSTGRES_USER:-$(envval POSTGRES_USER)}"
+POSTGRES_DB="${POSTGRES_DB:-$(envval POSTGRES_DB)}"
 USR="${POSTGRES_USER:-iplogger}"; DB="${POSTGRES_DB:-iplogger}"; TMPDB="iplogger_verify"
 psql_c() { docker compose exec -T postgres psql -U "$USR" -d "$1" -Atc "$2"; }
 

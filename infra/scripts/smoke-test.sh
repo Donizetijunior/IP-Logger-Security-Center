@@ -7,7 +7,10 @@
 set -uo pipefail
 
 cd "$(dirname "$0")/../.."
-set -a; [ -f .env ] && . ./.env; set +a
+# Lê variáveis do .env SEM executá-lo (valores com espaços/parênteses valem para o Docker, mas quebram o shell)
+envval() { [ -f .env ] && grep -E "^$1=" .env | tail -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' || true; }
+PUBLIC_SHORT_BASE_URL="${PUBLIC_SHORT_BASE_URL:-$(envval PUBLIC_SHORT_BASE_URL)}"
+PUBLIC_DASHBOARD_URL="${PUBLIC_DASHBOARD_URL:-$(envval PUBLIC_DASHBOARD_URL)}"
 LINKS_URL="${LINKS_URL:-${PUBLIC_SHORT_BASE_URL:-http://links.localhost:8088}}"
 PANEL_URL="${PANEL_URL:-${PUBLIC_DASHBOARD_URL:-http://painel.localhost:8088}}"
 CONNECT_TO="${CONNECT_TO:-127.0.0.1}"

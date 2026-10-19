@@ -13,7 +13,10 @@ if [ -f "$file.sha256" ]; then
   sha256sum -c "$file.sha256"
 fi
 
-set -a; [ -f .env ] && . ./.env; set +a
+# Lê variáveis do .env SEM executá-lo (valores com espaços/parênteses valem para o Docker, mas quebram o shell)
+envval() { [ -f .env ] && grep -E "^$1=" .env | tail -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' || true; }
+POSTGRES_USER="${POSTGRES_USER:-$(envval POSTGRES_USER)}"
+POSTGRES_DB="${POSTGRES_DB:-$(envval POSTGRES_DB)}"
 DB="${POSTGRES_DB:-iplogger}"; USR="${POSTGRES_USER:-iplogger}"
 
 echo "==> Parando api e worker (consultas bloqueadas durante a restauração)"
