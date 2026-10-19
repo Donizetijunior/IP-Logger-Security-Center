@@ -9,7 +9,7 @@ Legenda: ✅ verificado por teste automatizado executado e aprovado · 🧪 veri
 | Suíte | Comando | Resultado |
 |---|---|---|
 | Tipos (api, worker, shared, testes) + web | `npm run typecheck` / `npm run typecheck:web` | sem erros |
-| Unitários, integração (Postgres/Redis reais), segurança | `npm test` | **215 aprovados** em 9 arquivos (shared 67 · API 40 · multiusuário 22 · ferramentas 33 · worker 25 · provedores 17 · segurança 14 · cifragem de notas 3) |
+| Unitários, integração (Postgres/Redis reais), segurança | `npm test` | **243 aprovados** em 13 arquivos (inclui multiusuário 22 · ferramentas 33 · domínios 18)|
 | Build do painel | `npm run build:web` | ok (JS 315 kB / 98 kB gzip) |
 | E2E no stack Compose (Caddy→API→Postgres/Redis/Worker) | `npx vitest run tests/e2e` | **13/13 aprovados** (rodado sobre um banco migrado da v0.1), incluindo quedas reais de Redis e Postgres e o teste do Cloudflare Tunnel (`CF-Connecting-IP` só do contêiner do túnel) |
 | Smoke test de deploy | `./infra/scripts/smoke-test.sh` | **APROVADO** (contêineres saudáveis, DB/Redis não publicados, 404/401 corretos, CSP/nosniff, `Server` oculto) |
@@ -140,3 +140,18 @@ Verificado pela Internet (via Cloudflare Tunnel), com `NODE_ENV=production`, `CO
 | Dados de teste removidos após a verificação | ✅ |
 
 Pendências do operador: criar o encaminhamento `contato@iplogger.com.br` (Cloudflare Email Routing), girar o token do túnel (foi exposto no chat), e acompanhar a revisão jurídica descrita em [legal-decision.md](legal-decision.md).
+
+## Versão 0.4 — domínios personalizados
+
+| Item | Resultado | Evidência |
+|---|---|---|
+| Validação do hostname (IP, curinga, interno, hosts da plataforma, subdomínios da plataforma só pelo admin) e unicidade | ✅ | `domains.test.ts` |
+| Verificação por TXT (ausente/errado/correto) e checagem de roteamento (ok, desafio errado, HTTP inesperado, falha de rede) | ✅ | `domains.test.ts` |
+| Modos `admin`, `approval` e `open`; limite por usuário; aprovação só pelo admin; ativação exige propriedade verificada | ✅ | `domains.test.ts` |
+| Mesmo slug em domínios diferentes; link só responde no seu domínio; pendente/desativado não serve nada (421) | ✅ | `domains.test.ts` |
+| Endpoint de roteamento devolve só o hash do token e só para domínios cadastrados | ✅ | `domains.test.ts` |
+| Desativar/reativar tem efeito imediato (cache invalidado); excluir exige remover links; suspender o dono desativa os domínios | ✅ | `domains.test.ts` |
+| Raiz do domínio (404 ou redirecionamento validado), laço de redirecionamento bloqueado, denúncia por URL completa | ✅ | `domains.test.ts` |
+| Migration 004 sobre dados reais de produção | ✅🧪 | aplicada no servidor sem perda de dados |
+| Roteamento real pelo Caddy coringa em produção: domínio ativo ⇒ 302; host desconhecido ⇒ 421; rotas internas ⇒ 404; desativar ⇒ 421 | 🧪 | execução no servidor (domínio de teste removido) |
+| Domínio real de ponta a ponta (TXT + rota do túnel + TLS Cloudflare) | ⚠️ pendente | depende de um domínio seu na mesma conta Cloudflare |
