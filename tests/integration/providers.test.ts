@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { HttpRdapClient } from '../../apps/api/src/rdap.ts';
+import type { Hop, HopResult } from '../../apps/api/src/tools/safe-http.ts';
 import { AbuseIpDbProvider, GreyNoiseCommunityProvider } from '../../apps/worker/src/providers.ts';
 import { makeLink, startTestApp, type Session, type TestApp } from './helpers.ts';
 
@@ -88,25 +89,79 @@ describe('GreyNoise Community (contrato)', () => {
   });
 });
 
+function fakeHop(routes: Record<string, (url: string) => Partial<HopResult> & { json?: unknown }>) {
+  const calls: Array<{ url: string; method?: string }> = [];
+  const hop: Hop = async (url, opts) => {
+    calls.push({ url, method: opts?.method });
+    const key = Object.keys(routes).find((k) => url.startsWith(k));
+    if (!key) throw new Error(`rota inesperada: ${url}`);
+    const r = routes[key]!(url);
+    return {
+      status: r.status ?? 200,
+      headers: r.headers ?? {},
+      body: r.json !== undefined ? Buffer.from(JSON.stringify(r.json)) : (r.body ?? null),
+      ms: 1,
+      tls: true,
+    };
+  };
+  return { hop, calls };
+}
+
 describe('RDAP (anti-SSRF)', () => {
-  it('host fixo, IP público codificado no caminho, sem seguir redirecionamentos', async () => {
-    const f = vi.fn(async () => json({ handle: 'NET-8-8-8-0', name: 'GOGL', country: 'US', startAddress: '8.8.8.0', endAddress: '8.8.8.255', type: 'DIRECT ALLOCATION', entities: [{ vcardArray: ['segredo'] }] }));
-    const c = new HttpRdapClient('https://rdap.org/ip/', f as unknown as typeof fetch);
+  it('segue o redirecionamento do bootstrap (rdap.org -> servidor autoritativo) e reduz o payload', async () => {
+    const { hop, calls } = fakeHop({
+      'https://rdap.org/ip/': () => ({ status: 302, headers: { location: 'https://rdap.arin.net/registry/ip/8.8.8.8' } }),
+      'https://rdap.arin.net/': () => ({ json: { handle: 'NET-8-8-8-0', name: 'GOGL', country: 'US', startAddress: '8.8.8.0', endAddress: '8.8.8.255', type: 'DIRECT ALLOCATION', entities: [{ vcardArray: ['segredo'] }] } }),
+    });
+    const c = new HttpRdapClient('https://rdap.org/', hop);
     const r = await c.lookup('8.8.8.8');
     expect(r).toMatchObject({ handle: 'NET-8-8-8-0', country: 'US', fetchedFrom: 'rdap.org' });
     expect(JSON.stringify(r)).not.toContain('segredo');
-    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe('https://rdap.org/ip/8.8.8.8');
-    expect(init.redirect).toBe('manual');
+    expect(calls.map((x) => x.url)).toEqual(['https://rdap.org/ip/8.8.8.8', 'https://rdap.arin.net/registry/ip/8.8.8.8']);
+  });
+
+  it('redirecionamento para HTTP (rebaixamento) ou laço infinito é recusado', async () => {
+    const down = fakeHop({ 'https://rdap.org/': () => ({ status: 302, headers: { location: 'http://rdap.exemplo.org/x' } }) });
+    await expect(new HttpRdapClient('https://rdap.org/', down.hop).lookup('8.8.8.8')).rejects.toThrow(/HTTPS/);
+    const loop = fakeHop({ 'https://rdap.org/': () => ({ status: 302, headers: { location: 'https://rdap.org/ip/8.8.8.8' } }) });
+    await expect(new HttpRdapClient('https://rdap.org/', loop.hop).lookup('8.8.8.8')).rejects.toThrow(/Redirecionamentos/);
   });
 
   it('IPs privados/reservados e entradas maliciosas nunca geram requisição', async () => {
-    const f = vi.fn();
-    const c = new HttpRdapClient('https://rdap.org/ip/', f as unknown as typeof fetch);
+    const { hop, calls } = fakeHop({});
+    const c = new HttpRdapClient('https://rdap.org/', hop);
     for (const ip of ['127.0.0.1', '10.0.0.1', '169.254.169.254', '203.0.113.1', '8.8.8.8/../../admin', 'localhost', 'http://evil']) {
       expect(await c.lookup(ip)).toBeNull();
     }
-    expect(f).not.toHaveBeenCalled();
+    for (const d of ['localhost', '10.0.0.1', 'intranet.local', 'a_b.com', 'http://x', '', '-x.com', 'x'.repeat(300) + '.com']) {
+      expect(await c.lookupDomain(d)).toBeNull();
+    }
+    expect(calls).toHaveLength(0);
+  });
+
+  it('domínio: extrai somente dados do registro (sem contatos de pessoas)', async () => {
+    const { hop } = fakeHop({
+      'https://rdap.org/domain/': () => ({
+        json: {
+          ldhName: 'exemplo.com.br', status: ['active'],
+          events: [{ eventAction: 'registration', eventDate: '2020-01-01T00:00:00Z' }, { eventAction: 'expiration', eventDate: '2030-01-01T00:00:00Z' }, { eventAction: 'last changed', eventDate: '2026-01-01T00:00:00Z' }],
+          nameservers: [{ ldhName: 'a.dns.exemplo.com.br' }, { ldhName: 'b.dns.exemplo.com.br' }],
+          entities: [
+            { roles: ['registrant'], vcardArray: ['vcard', [['fn', {}, 'text', 'Pessoa Física Secreta'], ['email', {}, 'text', 'pessoa@exemplo.com']]] },
+            { roles: ['registrar'], handle: 'REG-1', vcardArray: ['vcard', [['fn', {}, 'text', 'Registrador Exemplo LTDA']]] },
+          ],
+        },
+      }),
+    });
+    const r = await new HttpRdapClient('https://rdap.org/', hop).lookupDomain('https://EXEMPLO.com.br/caminho?x=1');
+    expect(r).toMatchObject({ domain: 'exemplo.com.br', status: ['active'], registrar: 'Registrador Exemplo LTDA', registeredAt: '2020-01-01T00:00:00Z', expiresAt: '2030-01-01T00:00:00Z' });
+    expect(r?.nameservers).toEqual(['a.dns.exemplo.com.br', 'b.dns.exemplo.com.br']);
+    expect(JSON.stringify(r)).not.toMatch(/Secreta|pessoa@/);
+  });
+
+  it('404/sem corpo => null', async () => {
+    const { hop } = fakeHop({ 'https://rdap.org/': () => ({ status: 404 }) });
+    expect(await new HttpRdapClient('https://rdap.org/', hop).lookup('8.8.8.8')).toBeNull();
   });
 });
 
@@ -115,7 +170,7 @@ describe('perfil de IP com RDAP sob demanda (API)', () => {
   let s: Session;
   const lookup = vi.fn(async (ip: string) => ({ handle: 'NET-TESTE', name: 'Rede de Teste', country: 'BR', startAddress: ip, endAddress: ip, type: 'ALLOCATION', fetchedFrom: 'rdap.org' }));
   beforeAll(async () => {
-    t = await startTestApp({ RDAP_ENABLED: 'true' }, { rdap: { lookup } });
+    t = await startTestApp({ RDAP_ENABLED: 'true' }, { rdap: { lookup, lookupDomain: async () => null } });
     s = await t.login();
     await makeLink(t, s);
     await t.ctx.pool.query("INSERT INTO access_events (slug, ip_address, method, http_status) VALUES ('campanha-a1', '8.8.8.8', 'GET', 302)");

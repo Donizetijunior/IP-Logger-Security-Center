@@ -54,6 +54,25 @@ export function registerPublicAccount(app: FastifyInstance, ctx: Ctx, checkOrigi
     return reply.code(201).send({ status });
   });
 
+  // ---- Notas privadas: leitura pública (quem recebe o link não tem conta). Consome a nota (lê uma vez).
+  app.get('/public/notes/:id', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const { rows } = await pool.query<{ expires_at: Date }>('SELECT expires_at FROM private_notes WHERE id = $1 AND expires_at > now()', [id]);
+    if (!rows[0]) throw new HttpError(404, 'not_found', 'Nota inexistente, já lida ou expirada');
+    return { exists: true, expiresAt: rows[0].expires_at.toISOString() };
+  });
+
+  app.post('/public/notes/:id/read', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {
+    checkOrigin(req);
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    // Leitura única e atômica: apaga e devolve na mesma instrução
+    const { rows } = await pool.query<{ ciphertext: string; iv: string }>(
+      'DELETE FROM private_notes WHERE id = $1 AND expires_at > now() RETURNING ciphertext, iv', [id],
+    );
+    if (!rows[0]) throw new HttpError(404, 'not_found', 'Nota inexistente, já lida ou expirada');
+    return { ciphertext: rows[0].ciphertext, iv: rows[0].iv };
+  });
+
   app.post('/public/abuse-report', { config: { rateLimit: { max: 10, timeWindow: '1 hour' } } }, async (req, reply) => {
     checkOrigin(req);
     const body = abuseBody.parse(req.body);

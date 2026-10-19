@@ -6,6 +6,10 @@
 
 Este produto inclui dados GeoLite2 criados pela MaxMind, disponíveis em https://www.maxmind.com. O uso das bases está sujeito ao EULA da MaxMind (https://www.maxmind.com/en/geolite/eula), inclusive a obrigação de atualização e de atribuição. As bases **não** são distribuídas neste repositório.
 
+## IEEE OUI
+
+A ferramenta de fabricante por MAC embute o registro público de OUI do IEEE (https://standards-oui.ieee.org/), reduzido a prefixo → organização em `apps/api/data/oui.json`. Confira os termos de uso do IEEE ao redistribuir o arquivo.
+
 ## Provedores de Threat Intelligence
 
 AbuseIPDB (https://docs.abuseipdb.com/), GreyNoise Community (https://docs.greynoise.io/), Tor Project (https://check.torproject.org/exit-addresses) e serviços RDAP têm termos próprios de uso, cotas e licenças de dados. O operador é responsável por verificá-los e cumpri-los antes de habilitar cada integração.

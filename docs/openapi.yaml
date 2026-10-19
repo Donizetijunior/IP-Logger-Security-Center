@@ -20,6 +20,7 @@ tags:
   - { name: Sistema }
   - { name: Usuários }
   - { name: Moderação }
+  - { name: Ferramentas }
   - { name: Público }
 security:
   - sessionCookie: []
@@ -190,6 +191,49 @@ paths:
     get: { tags: [Moderação], summary: 'Fila de denúncias (somente admin)', parameters: [{ name: status, in: query, schema: { type: string, enum: [open, reviewing, link_disabled, dismissed] } }, { $ref: '#/components/parameters/Limit' }, { $ref: '#/components/parameters/Cursor' }], responses: { '200': { description: OK } } }
   /reports/{id}:
     patch: { tags: [Moderação], summary: 'Analisa a denúncia; pode desativar o link e suspender o dono', parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }], requestBody: { required: true, content: { application/json: { schema: { type: object, required: [status], properties: { status: { type: string, enum: [open, reviewing, link_disabled, dismissed] }, suspendOwner: { type: boolean } } } } } }, responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/Error' } } }
+  /tools/whoami:
+    get: { tags: [Ferramentas], summary: 'IP e User-Agent vistos pelo servidor', responses: { '200': { description: OK } } }
+  /tools/ip/{ip}:
+    get:
+      tags: [Ferramentas]
+      summary: 'Consulta de IP (geo/ASN locais, DNS reverso, Tor; RDAP opcional). IP não público não gera consulta externa'
+      parameters:
+        - { name: ip, in: path, required: true, schema: { type: string } }
+        - { name: rdap, in: query, schema: { type: string, enum: ['true', 'false'], default: 'false' } }
+      responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/Error' }, '502': { $ref: '#/components/responses/Error' }, '503': { $ref: '#/components/responses/Error' } }
+  /tools/whois:
+    get:
+      tags: [Ferramentas]
+      summary: 'WHOIS/RDAP de domínio ou IP público (sem contatos pessoais)'
+      parameters: [{ name: q, in: query, required: true, schema: { type: string } }]
+      responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/Error' }, '502': { $ref: '#/components/responses/Error' }, '503': { $ref: '#/components/responses/Error' } }
+  /tools/mac:
+    get:
+      tags: [Ferramentas]
+      summary: 'Fabricante pelo prefixo OUI do MAC (registro IEEE)'
+      parameters: [{ name: q, in: query, required: true, schema: { type: string } }]
+      responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/Error' } }
+  /tools/url-check:
+    post:
+      tags: [Ferramentas]
+      summary: 'Cadeia de redirecionamentos de uma URL (somente cabeçalhos; protegido contra SSRF)'
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [url], properties: { url: { type: string, maxLength: 2048 } } } } } }
+      responses: { '200': { description: 'Resultado (erros de rede/bloqueio aparecem em error)' } }
+  /tools/notes:
+    get: { tags: [Ferramentas], summary: 'Notas privadas pendentes do usuário', responses: { '200': { description: OK } } }
+    post:
+      tags: [Ferramentas]
+      summary: 'Cria nota cifrada no cliente (ciphertext/iv base64url; TTL 1–168 h)'
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [ciphertext, iv], properties: { ciphertext: { type: string }, iv: { type: string }, ttlHours: { type: integer, minimum: 1, maximum: 168, default: 24 } } } } } }
+      responses: { '201': { description: Criada }, '400': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } }
+  /tools/notes/{id}:
+    delete: { tags: [Ferramentas], summary: 'Apaga uma nota própria', parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }], responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/Error' } } }
+  /public/notes/{id}:
+    get: { tags: [Público], security: [], summary: 'Verifica se a nota existe (não a consome)', parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/Error' } } }
+  /public/notes/{id}/read:
+    post: { tags: [Público], security: [], summary: 'Lê e DESTRÓI a nota (leitura única e atômica)', parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { description: 'ciphertext + iv' }, '404': { $ref: '#/components/responses/Error' } } }
 x-public-routes:
   note: Rotas do domínio de links (fora de /api/v1)
   routes:

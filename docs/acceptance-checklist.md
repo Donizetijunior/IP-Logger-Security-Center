@@ -9,7 +9,7 @@ Legenda: ✅ verificado por teste automatizado executado e aprovado · 🧪 veri
 | Suíte | Comando | Resultado |
 |---|---|---|
 | Tipos (api, worker, shared, testes) + web | `npm run typecheck` / `npm run typecheck:web` | sem erros |
-| Unitários, integração (Postgres/Redis reais), segurança | `npm test` | **182 aprovados** em 6 arquivos (shared 67 · API 40 · multiusuário 22 · worker 25 · provedores 14 · segurança 14) |
+| Unitários, integração (Postgres/Redis reais), segurança | `npm test` | **215 aprovados** em 9 arquivos (shared 67 · API 40 · multiusuário 22 · ferramentas 33 · worker 25 · provedores 17 · segurança 14 · cifragem de notas 3) |
 | Build do painel | `npm run build:web` | ok (JS 315 kB / 98 kB gzip) |
 | E2E no stack Compose (Caddy→API→Postgres/Redis/Worker) | `npx vitest run tests/e2e` | **13/13 aprovados** (rodado sobre um banco migrado da v0.1), incluindo quedas reais de Redis e Postgres e o teste do Cloudflare Tunnel (`CF-Connecting-IP` só do contêiner do túnel) |
 | Smoke test de deploy | `./infra/scripts/smoke-test.sh` | **APROVADO** (contêineres saudáveis, DB/Redis não publicados, 404/401 corretos, CSP/nosniff, `Server` oculto) |
@@ -108,3 +108,18 @@ E2E_TOTP_SECRET=... E2E_PASSWORD=... npm run test:load
 | Telas (cadastro, login de usuário, painel limitado, Usuários) | 🧪 | verificado no navegador |
 | **Publicação em iplogger.com.br** | ⚠️ pendente | exige token do túnel na Cloudflare e decisão jurídica (`LEGAL_REVIEW_ACKNOWLEDGED`) |
 | Verificação de e-mail / CAPTCHA / MFA para usuários | ⚠️ não implementado | — |
+
+## Versão 0.3 — ferramentas
+
+| Item | Resultado | Evidência |
+|---|---|---|
+| Ferramentas exigem login; usuários comuns têm acesso | ✅ | `tools.test.ts` |
+| Consulta de IP: nada externo para IP não público; RDAP sob demanda com cache; sem vazar inteligência de terceiros | ✅ | `tools.test.ts` |
+| WHOIS/RDAP de domínio e IP (sem contatos pessoais; 502 sem detalhes internos; 503 se desabilitado) | ✅ | `tools.test.ts`, `tools-real-transport.test.ts`, `providers.test.ts` |
+| RDAP segue o redirecionamento do `rdap.org` com validação por salto | ✅🧪 | testes + consulta real a 8.8.8.8 e registro.br (corrigiu um defeito: o cliente anterior não seguia redirecionamentos) |
+| Fabricante por MAC (OUI 24/28/36 bits, MAC aleatório) | ✅ | `tools.test.ts` (40.349 prefixos) |
+| Verificador de URL: cadeia, rebaixamento, laço, HEAD→GET, erros | ✅🧪 | `tools.test.ts`; real contra example.org e google.com |
+| **SSRF** com o transporte real: loopback, metadados de nuvem, IPs numéricos, esquemas, portas 22/6379, credenciais | ✅ | `tools-real-transport.test.ts`, unidade de `guardedLookup`/`safeHop` |
+| Notas privadas: leitura única atômica (8 leituras paralelas ⇒ 1), expiração, quota, cifragem no cliente | ✅ | `tools.test.ts`, `notecrypto.test.ts` |
+| Telas das ferramentas | 🧪 | verificado no navegador (usuário comum) |
+| Reputação AbuseIPDB/GreyNoise nas ferramentas | ⚠️ não exposta (decisão de privacidade/cota) | — |

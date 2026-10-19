@@ -13,6 +13,7 @@ import { registerExports } from './exports.ts';
 import { registerPublicAccount } from './signup.ts';
 import { eraseAccount, registerUsers } from './users.ts';
 import { registerReports } from './reports.ts';
+import { registerTools } from './tools.ts';
 
 const loginBody = z.object({ email: z.string().email().max(254), password: z.string().min(1).max(256) });
 const verifyBody = z.object({ challenge: z.string().min(20).max(100), code: z.string().min(6).max(32) });
@@ -171,5 +172,6 @@ export function registerAdmin(app: FastifyInstance, ctx: Ctx): void {
     registerMisc(priv, ctx);
     registerUsers(priv, ctx);
     registerReports(priv, ctx);
+    registerTools(priv, ctx);
   });
 }
