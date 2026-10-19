@@ -17,15 +17,15 @@ Logs são JSON em stdout com rotação (`json-file`, 10 MB × 5). **Não contêm
 
 ## Backup e restauração
 
-- **Backup diário automático:** o cron do servidor roda  às **03:30 UTC** (00:30 em Brasília):  criptografado com AES-256 (PBKDF2), , permissão  e **exclusão de cópias com mais de 14 dias**. Destino: ; log em  na mesma pasta.
-- **Trava de disco:** o backup **aborta** (código 2) se o destino tiver menos de  (padrão 5 GB) livres, para nunca encher o disco de um servidor compartilhado com outros projetos.
+- **Backup diário automático:** o cron do servidor roda `infra/scripts/backup.sh` às **03:30 UTC** (00:30 em Brasília): `pg_dump -Fc` criptografado com AES-256 (PBKDF2), `sha256`, permissão `600` e **exclusão de cópias com mais de 14 dias**. Destino: `~/iplogger-backups`; log em `backup.log` na mesma pasta.
+- **Trava de disco:** o backup **aborta** (código 2) se o destino tiver menos de `BACKUP_MIN_FREE_GB` (padrão 5 GB) livres, para nunca encher o disco de um servidor compartilhado com outros projetos.
 - **Tamanho:** ~43–150 bytes por evento comprimido; ~600 bytes por evento no banco (medido com 100 mil eventos). Até ~100 mil acessos/dia os 14 backups ocupam ~6 GB.
-- **Chave:**  (600) no servidor **e uma cópia fora dele** (guarde em gerenciador de senhas). Sem a chave os backups são irrecuperáveis; com a chave e o arquivo qualquer pessoa os abre — trate os dois como segredos.
-- **Cópia fora do servidor:** os backups ficam no mesmo disco do banco, então **não protegem contra perda do servidor**. Copie periodicamente  para outro lugar (ex.: / para seu computador), respeitando a retenção.
-- **Verificar um backup sem tocar na produção:**  descriptografa, confere o hash, restaura em um banco temporário , compara contagens e o remove. Rode após mudanças no esquema e ao menos uma vez por mês.
+- **Chave:** `~/.iplogger-backup.key` (permissão 600) no servidor **e uma cópia fora dele** (guarde em gerenciador de senhas). Sem a chave os backups são irrecuperáveis; com a chave e o arquivo qualquer pessoa os abre — trate os dois como segredos.
+- **Cópia fora do servidor:** os backups ficam no mesmo disco do banco, então **não protegem contra perda do servidor**. Copie periodicamente `~/iplogger-backups` para outro lugar (ex.: `scp`/`rsync` para seu computador), respeitando a retenção.
+- **Verificar um backup sem tocar na produção:** `BACKUP_KEY_FILE=... BACKUP_DIR=... ./infra/scripts/verify-backup.sh` descriptografa, confere o hash, restaura em um banco temporário `iplogger_verify`, compara contagens e o remove. Rode após mudanças no esquema e ao menos uma vez por mês.
 - **RPO** alvo: 24 h. **RTO** alvo: < 1 h.
-- **Restauração**: . Verifica o hash, **para api/worker/caddy**, restaura, **executa o expurgo de retenção antes de reabrir as consultas** (CA-18) e só então sobe os serviços.
-- Os scripts leem o  sem executá-lo (valores com espaços/parênteses são válidos para o Docker e quebrariam um ).
+- **Restauração**: `BACKUP_KEY_FILE=… ./infra/scripts/restore.sh <arquivo.dump.enc>`. Verifica o hash, **para api/worker/caddy**, restaura, **executa o expurgo de retenção antes de reabrir as consultas** (CA-18) e só então sobe os serviços.
+- Os scripts leem o `.env` sem executá-lo (valores com espaços/parênteses são válidos para o Docker e quebrariam um `source`).
 
 ## Expurgo (retenção de 30 dias)
 
