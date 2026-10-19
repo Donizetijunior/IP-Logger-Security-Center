@@ -9,6 +9,10 @@ const STATUS: Record<UserItem['status'], { label: string; kind: 'ok' | 'warn' | 
   suspended: { label: 'Suspenso', kind: 'bad' },
 };
 
+interface NewAdmin {
+  id: string; email: string; temporaryPassword?: string; totpSecret: string; otpauthUri: string; qrSvg: string; recoveryCodes: string[];
+}
+
 export function UsersPage() {
   const [items, setItems] = useState<UserItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -23,6 +27,17 @@ export function UsersPage() {
   const [password, setPassword] = useState('');
   const [quota, setQuota] = useState('');
   const [formError, setFormError] = useState<unknown>(null);
+  const [meId, setMeId] = useState<string | null>(null);
+
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPass, setAdminPass] = useState('');
+  const [reauth, setReauth] = useState('');
+  const [adminError, setAdminError] = useState<unknown>(null);
+  const [newAdmin, setNewAdmin] = useState<NewAdmin | null>(null);
+
+  useEffect(() => {
+    api.get<{ id: string }>('/auth/me').then((m) => setMeId(m.id)).catch(() => undefined);
+  }, []);
 
   const load = useCallback(async (reset: boolean, from?: string | null) => {
     setLoading(true);
@@ -57,6 +72,21 @@ export function UsersPage() {
       await load(true);
     } catch (err) {
       setFormError(err);
+    }
+  };
+
+  const createAdmin = async (e: FormEvent) => {
+    e.preventDefault();
+    setAdminError(null);
+    setNewAdmin(null);
+    try {
+      await api.post('/auth/reauth', { password: reauth });
+      const r = await api.post<NewAdmin>('/users/admins', { email: adminEmail, password: adminPass || undefined });
+      setNewAdmin(r);
+      setAdminEmail(''); setAdminPass(''); setReauth('');
+      await load(true);
+    } catch (err) {
+      setAdminError(err);
     }
   };
 
@@ -105,6 +135,38 @@ export function UsersPage() {
         {formError ? <div className="mt-3"><ErrorBox error={formError} /></div> : null}
       </Card>
 
+      <Card title="Novo administrador" className="mb-5">
+        <p className="mb-3 text-sm" style={{ color: 'var(--muted)' }}>
+          Administradores veem todos os usuários, links e eventos e exigem autenticação em dois fatores (TOTP). O QR code, a senha temporária e os códigos de recuperação aparecem <strong>uma única vez</strong>.
+        </p>
+        <form onSubmit={createAdmin} className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <Field label="E-mail do novo admin"><input type="email" required value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} className="w-full" /></Field>
+          <Field label="Senha (vazio = gerar temporária)"><input type="text" autoComplete="off" value={adminPass} onChange={(e) => setAdminPass(e.target.value)} className="w-full" /></Field>
+          <Field label="Sua senha (confirmação)"><input type="password" required autoComplete="current-password" value={reauth} onChange={(e) => setReauth(e.target.value)} className="w-full" /></Field>
+          <div className="md:col-span-3"><Button type="submit">Criar administrador</Button></div>
+        </form>
+        {adminError ? <div className="mt-3"><ErrorBox error={adminError} /></div> : null}
+      </Card>
+
+      {newAdmin && (
+        <div role="status" className="mb-4 rounded-lg p-4 text-sm" style={{ background: 'var(--warn-bg)', color: 'var(--warn-fg)' }}>
+          <strong>Administrador {newAdmin.email} criado. Entregue por um canal seguro — não será exibido de novo.</strong>
+          <div className="mt-3 flex flex-wrap items-start gap-4">
+            <img alt="QR code para o aplicativo autenticador" width={200} height={200} className="rounded bg-white p-1"
+              src={`data:image/svg+xml;utf8,${encodeURIComponent(newAdmin.qrSvg)}`} />
+            <div className="min-w-0 flex-1 space-y-2">
+              {newAdmin.temporaryPassword && <div>Senha temporária: <code className="select-all font-semibold">{newAdmin.temporaryPassword}</code></div>}
+              <div>Segredo TOTP: <code className="select-all break-all font-semibold">{newAdmin.totpSecret}</code></div>
+              <div>
+                Códigos de recuperação (uso único):
+                <ul className="mt-1 grid grid-cols-2 gap-x-4 font-mono text-xs">{newAdmin.recoveryCodes.map((c) => <li key={c} className="select-all">{c}</li>)}</ul>
+              </div>
+              <div className="text-xs">No primeiro acesso ele escaneia o QR, troca a senha e aceita os Termos.</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {temp && (
         <div role="status" className="mb-4 rounded-lg p-4 text-sm" style={{ background: 'var(--warn-bg)', color: 'var(--warn-fg)' }}>
           <strong>Senha temporária de {temp.email} (exibida uma única vez):</strong>{' '}
@@ -141,12 +203,12 @@ export function UsersPage() {
                     <td className="text-sm">{{ self: 'Cadastro', admin: 'Criado pelo admin', cli: 'Instalação' }[u.signupSource] ?? u.signupSource}</td>
                     <td className="text-sm"><Time iso={u.createdAt} /></td>
                     <td>
-                      {u.role !== 'admin' && (
+                      {u.id !== meId && (
                         <div className="flex flex-wrap gap-1.5">
                           {u.status === 'pending' && <Button onClick={() => void setUserStatus(u, 'active')}>Aprovar</Button>}
                           {u.status === 'active' && <Button variant="secondary" onClick={() => void setUserStatus(u, 'suspended')}>Suspender</Button>}
                           {u.status === 'suspended' && <Button variant="secondary" onClick={() => void setUserStatus(u, 'active')}>Reativar</Button>}
-                          <Button variant="secondary" onClick={() => setQuotaFor(u)}>Limite</Button>
+                          {u.role !== 'admin' && <Button variant="secondary" onClick={() => setQuotaFor(u)}>Limite</Button>}
                           <Button variant="secondary" onClick={() => reset(u)}>Redefinir senha</Button>
                           <Button variant="danger" onClick={() => remove(u)}>Excluir</Button>
                         </div>

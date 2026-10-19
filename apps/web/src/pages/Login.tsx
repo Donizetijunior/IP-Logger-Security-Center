@@ -72,7 +72,7 @@ export function LoginPage({ onLoggedIn, config }: { onLoggedIn: () => Promise<vo
           <form onSubmit={submitCode} className="flex flex-col gap-4">
             {mfaSetupPending && (
               <p className="rounded-lg p-3 text-sm" style={{ background: 'var(--info-bg)', color: 'var(--info-fg)' }}>
-                Primeiro acesso: confirme o MFA com o código atual do aplicativo autenticador cadastrado pelo comando de criação do administrador.
+                Primeiro acesso: confirme o MFA com o código atual do aplicativo autenticador cadastrado (escaneie o QR code entregue pelo administrador que criou sua conta).
               </p>
             )}
             <Field label="Código do autenticador (6 dígitos) ou código de recuperação">

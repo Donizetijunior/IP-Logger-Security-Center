@@ -186,6 +186,24 @@ paths:
     parameters: [{ $ref: '#/components/parameters/Id' }]
     patch: { tags: [Usuários], summary: 'Altera estado (active/pending/suspended) ou limite de links', parameters: [{ $ref: '#/components/parameters/Csrf' }], requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { status: { type: string, enum: [active, pending, suspended] }, linkQuota: { type: integer, minimum: 0 } } } } } }, responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } } }
     delete: { tags: [Usuários], summary: 'Exclui usuário e todos os seus dados', parameters: [{ $ref: '#/components/parameters/Csrf' }], responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/Error' } } }
+  /users/admins:
+    post:
+      summary: Cria um administrador (exige reautenticação recente; segredos exibidos uma única vez)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string }
+                password: { type: string, description: Opcional; vazio gera senha temporária }
+      responses:
+        '201': { description: Criado (id, email, temporaryPassword?, totpSecret, otpauthUri, qrSvg, recoveryCodes) }
+        '400': { description: Senha fraca ou e-mail inválido }
+        '403': { description: Não é admin ou reauth_required }
+        '409': { description: E-mail já cadastrado }
   /users/{id}/reset-password:
     post: { tags: [Usuários], summary: 'Gera senha temporária (encerra sessões; exige nova troca)', parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }], responses: { '200': { description: OK } } }
   /reports:

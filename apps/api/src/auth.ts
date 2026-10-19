@@ -279,14 +279,26 @@ export async function bootstrapAdmin(pool: Pool, encKey: Buffer, email: string, 
   if (weak) throw new Error(weak);
   if (!EMAIL_REGEX.test(email)) throw new Error('E-mail inválido');
   const { rows: existing } = await pool.query("SELECT 1 FROM accounts WHERE role = 'admin'");
-  if (existing.length > 0) throw new Error('Já existe um administrador; use o painel para criar usuários comuns');
+  if (existing.length > 0) throw new Error('Já existe um administrador; outros administradores são criados pelo painel (Usuários → Novo administrador)');
+  return createAdminAccount(pool, encKey, { email, password, signupSource: 'cli', createdBy: null, mustChangePassword: false });
+}
 
+/**
+ * Cria uma conta ADMINISTRADORA com MFA (TOTP) obrigatório e 10 códigos de recuperação.
+ * O segredo e os códigos só são devolvidos aqui, uma única vez. Quem chama decide o fluxo
+ * (CLI do primeiro admin, ou painel com reautenticação do admin que está criando).
+ */
+export async function createAdminAccount(
+  pool: Pool,
+  encKey: Buffer,
+  opts: { email: string; password: string; signupSource: 'cli' | 'admin'; createdBy: string | null; mustChangePassword: boolean },
+): Promise<BootstrapResult> {
   const secret = authenticator.generateSecret(20);
-  const passwordHash = await hashPassword(password);
+  const passwordHash = await hashPassword(opts.password);
   const { rows } = await pool.query<{ id: string }>(
-    `INSERT INTO accounts (email, password_hash, totp_secret_encrypted, role, status, terms_accepted_at, link_quota, signup_source)
-     VALUES ($1, $2, $3, 'admin', 'active', now(), 1000000, 'cli') RETURNING id`,
-    [email, passwordHash, encryptSecret(secret, encKey)],
+    `INSERT INTO accounts (email, password_hash, totp_secret_encrypted, role, status, terms_accepted_at, link_quota, signup_source, must_change_password, created_by)
+     VALUES ($1, $2, $3, 'admin', 'active', $4, 1000000, $5, $6, $7) RETURNING id`,
+    [opts.email.trim(), passwordHash, encryptSecret(secret, encKey), opts.mustChangePassword ? null : new Date(), opts.signupSource, opts.mustChangePassword, opts.createdBy],
   );
   const accountId = rows[0]!.id;
   const codes = Array.from({ length: 10 }, () => generateRecoveryCode());
@@ -296,7 +308,7 @@ export async function bootstrapAdmin(pool: Pool, encKey: Buffer, email: string, 
   return {
     accountId,
     totpSecret: secret,
-    otpauthUri: authenticator.keyuri(email, 'IP Logger Security Center', secret),
+    otpauthUri: authenticator.keyuri(opts.email.trim(), 'IP Logger Security Center', secret),
     recoveryCodes: codes,
   };
 }

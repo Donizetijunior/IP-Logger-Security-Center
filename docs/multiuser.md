@@ -9,7 +9,7 @@ A partir da versão 0.2 a plataforma é **multiusuário**: cada pessoa cria e v�
 | **Administrador** (um único) | CLI `bootstrap-admin` (nunca pela web) | TOTP obrigatório + códigos de recuperação | Tudo: todos os links/eventos, usuários, denúncias, integrações, auditoria |
 | **Usuário** | Cadastro público, ou criado pelo admin | Não (senha forte; bloqueio após falhas) | Apenas links, eventos, IPs, alertas e exportações **dos próprios links** |
 
-O papel **nunca** vem do cliente (campos extras no cadastro são ignorados — testado). O índice `accounts_single_admin` garante no máximo uma conta admin.
+O papel **nunca** vem do cliente (campos extras no cadastro são ignorados — testado). Pode haver **vários administradores** (migração 005 removeu o índice `accounts_single_admin`). Um admin só é criado por outro admin, no painel (**Usuários → Novo administrador**), exigindo reautenticação recente (senha); o CLI cria apenas o primeiro. Todo admin tem MFA TOTP obrigatório: QR, segredo, senha temporária e 10 códigos de recuperação são exibidos uma única vez, e no primeiro acesso ele troca a senha e aceita os Termos.
 
 ## Modo de cadastro (`SIGNUP_MODE`)
 
@@ -25,7 +25,7 @@ Limites: `SIGNUP_RATE_PER_HOUR` cadastros por IP (padrão 5), `DEFAULT_LINK_QUOT
 
 ## Gestão de usuários (admin → *Usuários*)
 
-Criar (com senha temporária gerada e exibida **uma única vez**; o usuário é obrigado a trocá-la e a aceitar os Termos no primeiro acesso), aprovar, suspender/reativar, ajustar limite de links, redefinir senha (encerra sessões) e excluir (apaga links, eventos, alertas e exportações, sem deixar eventos órfãos). A conta administradora é protegida contra alteração/exclusão por essas rotas.
+Criar (com senha temporária gerada e exibida **uma única vez**; o usuário é obrigado a trocá-la e a aceitar os Termos no primeiro acesso), aprovar, suspender/reativar, ajustar limite de links, redefinir senha (encerra sessões) e excluir (apaga links, eventos, alertas e exportações, sem deixar eventos órfãos). Ninguém altera, suspende ou exclui a **própria** conta por essas rotas (400 `self_protected`), e o **último administrador ativo** não pode ser suspenso/excluído (409 `last_admin`). Um admin pode redefinir a senha, suspender ou excluir outro admin; suspender um admin não desativa links ou domínios (só os de usuários comuns).
 
 Suspender uma conta: revoga sessões, **desativa todos os links** e marca-os como *moderados* — o dono **não consegue reativá-los** (`disabled_by_moderation`); só o admin.
 

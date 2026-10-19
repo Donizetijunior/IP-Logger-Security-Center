@@ -1,7 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
+import QRCode from 'qrcode';
 import { z } from 'zod';
-import { EMAIL_REGEX, hashPassword, validatePasswordStrength } from '../auth.ts';
+import { AuthService, EMAIL_REGEX, createAdminAccount, hashPassword, validatePasswordStrength } from '../auth.ts';
 import { audit } from '../audit.ts';
 import type { Ctx } from '../context.ts';
 import { HttpError, decodeCursor, encodeCursor, requireAdmin } from '../util.ts';
@@ -122,11 +123,48 @@ export function registerUsers(app: FastifyInstance, ctx: Ctx): void {
     }
   });
 
-  const targetUser = async (id: string) => {
+  /** Novo administrador (MFA obrigatório). Exige reautenticação recente; segredo e códigos são exibidos UMA vez. */
+  app.post('/users/admins', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
+    requireAdmin(req);
+    const session = req.session!;
+    if (!AuthService.isRecentlyReauthenticated(session)) {
+      await audit(pool, { accountId: session.accountId, action: 'admin.create', result: 'denied', metadata: { reason: 'reauth_required' } });
+      throw new HttpError(403, 'reauth_required', 'Confirme sua senha para criar um administrador');
+    }
+    const body = z.object({ email: z.string().max(254).regex(EMAIL_REGEX, 'E-mail inválido'), password: z.string().max(256).optional() }).parse(req.body);
+    const temp = body.password === undefined;
+    const password = body.password ?? generateTempPassword();
+    if (!temp) {
+      const weak = validatePasswordStrength(password);
+      if (weak) throw new HttpError(400, 'weak_password', weak);
+    }
+    try {
+      const r = await createAdminAccount(pool, ctx.encKey, { email: body.email, password, signupSource: 'admin', createdBy: session.accountId, mustChangePassword: true });
+      const qrSvg = await QRCode.toString(r.otpauthUri, { type: 'svg', margin: 1, width: 240 });
+      await audit(pool, { accountId: session.accountId, action: 'admin.create', resource: `user:${r.accountId}`, result: 'success' });
+      return reply.code(201).send({
+        id: r.accountId, email: body.email.trim(), temporaryPassword: temp ? password : undefined,
+        totpSecret: r.totpSecret, otpauthUri: r.otpauthUri, qrSvg, recoveryCodes: r.recoveryCodes,
+      });
+    } catch (err) {
+      if ((err as { code?: string }).code === '23505') throw new HttpError(409, 'email_taken', 'Este e-mail já está cadastrado');
+      throw err;
+    }
+  });
+
+  /**
+   * Carrega a conta-alvo e aplica as proteções: ninguém altera a própria conta por aqui e nunca se
+   * remove/suspende o ÚLTIMO administrador ativo (evita trancar o sistema).
+   */
+  const targetUser = async (id: string, actorId: string, removing = false) => {
     const { rows } = await pool.query<{ id: string; role: string; email: string }>('SELECT id, role, email FROM accounts WHERE id = $1', [id]);
     const u = rows[0];
     if (!u) throw new HttpError(404, 'not_found', 'Usuário não encontrado');
-    if (u.role === 'admin') throw new HttpError(400, 'admin_protected', 'A conta administradora não pode ser alterada por aqui');
+    if (u.id === actorId) throw new HttpError(400, 'self_protected', 'Você não pode alterar, suspender ou excluir a sua própria conta por aqui');
+    if (u.role === 'admin' && removing) {
+      const others = await pool.query("SELECT 1 FROM accounts WHERE role = 'admin' AND status = 'active' AND id <> $1", [id]);
+      if (others.rowCount === 0) throw new HttpError(409, 'last_admin', 'Não é possível remover o último administrador ativo');
+    }
     return u;
   };
 
@@ -134,7 +172,7 @@ export function registerUsers(app: FastifyInstance, ctx: Ctx): void {
     requireAdmin(req);
     const { id } = idParam.parse(req.params);
     const body = patchBody.parse(req.body);
-    await targetUser(id);
+    const target = await targetUser(id, req.session!.accountId, !!body.status && body.status !== 'active');
     const sets: string[] = [];
     const params: unknown[] = [id];
     if (body.status) { params.push(body.status); sets.push(`status = $${params.length}`); }
@@ -144,7 +182,7 @@ export function registerUsers(app: FastifyInstance, ctx: Ctx): void {
     if (body.status && body.status !== 'active') {
       await auth.revokeAllSessions(id);
       // Suspender também desativa os redirecionamentos dos links do usuário
-      if (body.status === 'suspended') {
+      if (body.status === 'suspended' && target.role === 'user') {
         const { rows } = await pool.query<{ slug: string }>(
           'UPDATE short_links SET is_active = false, moderation_disabled = true, updated_at = now() WHERE owner_id = $1 AND is_active RETURNING slug', [id],
         );
@@ -161,7 +199,7 @@ export function registerUsers(app: FastifyInstance, ctx: Ctx): void {
   app.post('/users/:id/reset-password', async (req) => {
     requireAdmin(req);
     const { id } = idParam.parse(req.params);
-    await targetUser(id);
+    await targetUser(id, req.session!.accountId);
     const temp = generateTempPassword();
     await pool.query('UPDATE accounts SET password_hash = $2, must_change_password = true, failed_logins = 0, locked_until = NULL WHERE id = $1', [id, await hashPassword(temp)]);
     await auth.revokeAllSessions(id);
@@ -172,7 +210,7 @@ export function registerUsers(app: FastifyInstance, ctx: Ctx): void {
   app.delete('/users/:id', async (req) => {
     requireAdmin(req);
     const { id } = idParam.parse(req.params);
-    await targetUser(id);
+    await targetUser(id, req.session!.accountId, true);
     const links = await eraseAccount(ctx, id);
     await audit(pool, { accountId: req.session!.accountId, action: 'user.delete', resource: `user:${id}`, result: 'success', metadata: { links } });
     return { ok: true };

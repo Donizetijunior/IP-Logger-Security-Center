@@ -4,7 +4,7 @@ Status: aceito · Data: 2026-10-19
 
 ## Mantido conforme o briefing
 
-Node.js 24 LTS, TypeScript, React + Vite + Tailwind, PostgreSQL, Redis/BullMQ, Caddy, Docker Compose, outbox transacional, 302 imediato, fail-open documentado, retenção de 30 dias, alertas só no painel, MFA TOTP + Argon2id, uma única conta de administrador.
+Node.js 24 LTS, TypeScript, React + Vite + Tailwind, PostgreSQL, Redis/BullMQ, Caddy, Docker Compose, outbox transacional, 302 imediato, fail-open documentado, retenção de 30 dias, alertas só no painel, MFA TOTP + Argon2id, uma única conta de administrador (substituída pela migração 005: múltiplos administradores, ver ADR 0002).
 
 ## Desvios (o briefing permite desde que registrados)
 

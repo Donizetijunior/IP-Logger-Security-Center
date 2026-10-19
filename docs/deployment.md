@@ -37,7 +37,7 @@ docker compose up -d --build
 docker compose run --rm api node apps/api/src/cli/bootstrap-admin.ts
 ```
 
-O comando pede e-mail e senha (≥ 12 caracteres, 3 classes de caracteres), cria **a única conta ativa**, e imprime **uma única vez** o segredo/URI TOTP e 10 códigos de recuperação. Cadastre o TOTP no autenticador e guarde os códigos. O MFA é confirmado no primeiro login. Não existe cadastro remoto; um segundo admin ativo é recusado pelo banco.
+O comando pede e-mail e senha (≥ 12 caracteres, 3 classes de caracteres), cria o **primeiro administrador**, e imprime **uma única vez** o segredo/URI TOTP e 10 códigos de recuperação. Cadastre o TOTP no autenticador e guarde os códigos. O MFA é confirmado no primeiro login. O CLI só serve para a instalação inicial (recusa se já existir admin); outros administradores são criados no painel, em **Usuários → Novo administrador**.
 
 ## 4. Geolocalização local (campo "Local estimado")
 
