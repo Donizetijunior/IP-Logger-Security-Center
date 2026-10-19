@@ -1,0 +1,38 @@
+{
+  "name": "iplogger-security-center",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run packages apps",
+    "test:integration": "vitest run tests/integration tests/security",
+    "db:migrate": "node packages/database/src/cli.ts migrate",
+    "db:seed": "node packages/database/src/cli.ts seed",
+    "admin:bootstrap": "node apps/api/src/cli/bootstrap-admin.ts",
+    "purge": "node apps/worker/src/cli/purge.ts",
+    "dev:api": "node --watch apps/api/src/main.ts",
+    "dev:worker": "node --watch apps/worker/src/main.ts",
+    "dev:web": "npm run dev -w @ipl/web",
+    "build:web": "npm run build -w @ipl/web",
+    "typecheck:web": "npm run typecheck -w @ipl/web",
+    "ci": "npm run typecheck && npm run typecheck:web && npm test && npm run build:web",
+    "test:e2e": "vitest run tests/e2e",
+    "test:load": "node tests/load/redirect-load.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  },
+  "license": "UNLICENSED"
+}

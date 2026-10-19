@@ -1,0 +1,73 @@
+{
+	email {$ACME_EMAIL}
+	# Somente o Caddy é exposto. O IP real do visitante é repassado em X-Forwarded-For
+	# (sobrescrevendo qualquer valor enviado pelo cliente); a API só confia nesse header
+	# quando a conexão vem do IP fixo do Caddy (TRUSTED_PROXY_CIDRS).
+}
+
+(security_headers) {
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		X-Robots-Tag "noindex, nofollow"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+	}
+}
+
+# ----- Domínio dos links curtos (redirecionamento imediato) -----
+{$LINKS_SITE} {
+	import security_headers
+	header Strict-Transport-Security "max-age=31536000"
+	request_body {
+		max_size 16KB
+	}
+	# Apenas rotas públicas: nada de /api, /metrics, /readyz.
+	@blocked path /api/* /metrics /readyz /healthz
+	handle @blocked {
+		respond 404
+	}
+
+	handle {
+	reverse_proxy api:3000 {
+		header_up X-Forwarded-For {remote_host}
+		header_up -Forwarded
+		header_up -X-Real-IP
+		transport http {
+			dial_timeout 3s
+			response_header_timeout 10s
+		}
+	}
+	}
+}
+
+# ----- Painel administrativo -----
+{$PANEL_SITE} {
+	import security_headers
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+		X-Frame-Options DENY
+		Cross-Origin-Opener-Policy same-origin
+	}
+	request_body {
+		max_size 128KB
+	}
+
+	@blocked path /metrics /readyz /healthz
+	handle @blocked {
+		respond 404
+	}
+
+	@api path /api/* /privacy
+	handle @api {
+		reverse_proxy api:3000 {
+			header_up X-Forwarded-For {remote_host}
+			header_up -Forwarded
+			header_up -X-Real-IP
+		}
+	}
+	handle {
+		reverse_proxy web:8080
+	}
+}

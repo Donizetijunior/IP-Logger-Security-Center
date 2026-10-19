@@ -1,0 +1,225 @@
+openapi: 3.1.0
+info:
+  title: IP Logger Security Center API
+  version: 0.1.0
+  description: |
+    API REST administrativa (`/api/v1`, autenticada por cookie de sessão + CSRF) e rotas públicas.
+    Erros seguem `{ "error": { "code": string, "message": string, "details"?: [...] } }`.
+    Paginação por cursor opaco (`nextCursor`). Timestamps ISO 8601 em UTC.
+servers:
+  - url: https://painel.exemplo.com/api/v1
+    description: Painel (API administrativa)
+tags:
+  - { name: Auth }
+  - { name: Links }
+  - { name: Eventos }
+  - { name: Dashboard }
+  - { name: Alertas }
+  - { name: Exportações }
+  - { name: Sistema }
+  - { name: Público }
+security:
+  - sessionCookie: []
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Verifica e-mail/senha e abre desafio de MFA (limite 10/min por IP)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/LoginRequest' } } } }
+      responses:
+        '200': { description: Desafio criado, content: { application/json: { schema: { $ref: '#/components/schemas/LoginResponse' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+        '429': { description: Conta bloqueada ou limite excedido, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /auth/totp/verify:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Valida TOTP (6 dígitos) ou código de recuperação e cria a sessão (cookie HttpOnly)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/VerifyRequest' } } } }
+      responses:
+        '200': { description: Sessão criada, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+  /auth/logout:
+    post: { tags: [Auth], summary: Revoga a sessão, parameters: [{ $ref: '#/components/parameters/Csrf' }], responses: { '200': { description: OK }, '401': { $ref: '#/components/responses/Error' } } }
+  /auth/me:
+    get: { tags: [Auth], summary: 'Estado da sessão (retorna o token CSRF)', responses: { '200': { description: OK }, '401': { $ref: '#/components/responses/Error' } } }
+  /auth/reauth:
+    post:
+      tags: [Auth]
+      summary: Reautentica com a senha (necessário por 5 min para exportar)
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [password], properties: { password: { type: string } } } } } }
+      responses: { '200': { description: OK }, '401': { $ref: '#/components/responses/Error' } }
+  /links:
+    get:
+      tags: [Links]
+      summary: Lista links com métricas
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 100 } }
+        - { name: active, in: query, schema: { type: string, enum: ['true', 'false'] } }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Cursor' }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LinkPage' } } } } }
+    post:
+      tags: [Links]
+      summary: Cria link (destino validado; slug opcional)
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateLink' } } } }
+      responses:
+        '201': { description: Criado, content: { application/json: { schema: { $ref: '#/components/schemas/Link' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '409': { description: Slug em uso, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /links/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get: { tags: [Links], summary: 'Detalhe e métricas', responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Link' } } } }, '404': { $ref: '#/components/responses/Error' } } }
+    patch:
+      tags: [Links]
+      summary: Altera rótulo, destino, validade ou ativação
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PatchLink' } } } }
+      responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+    delete: { tags: [Links], summary: 'Remove (soft delete) e desativa', parameters: [{ $ref: '#/components/parameters/Csrf' }], responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/Error' } } }
+  /events:
+    get:
+      tags: [Eventos]
+      summary: Eventos de acesso com filtros combináveis (ordenação estável por data/id)
+      parameters:
+        - { name: ip, in: query, schema: { type: string } }
+        - { name: linkId, in: query, schema: { type: string, format: uuid } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: country, in: query, schema: { type: string, minLength: 2, maxLength: 2 } }
+        - { name: minScore, in: query, schema: { type: integer, minimum: 0, maximum: 100 } }
+        - { name: riskLevel, in: query, schema: { $ref: '#/components/schemas/RiskLevel' } }
+        - { name: method, in: query, schema: { type: string, enum: [GET, HEAD] } }
+        - { name: clientClass, in: query, schema: { type: string, enum: [human_probable, bot, preview, head_probe, unknown] } }
+        - { name: enrichmentStatus, in: query, schema: { type: string, enum: [pending, done, partial, failed, skipped] } }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Cursor' }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/EventPage' } } } }, '400': { $ref: '#/components/responses/Error' } }
+  /events/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get: { tags: [Eventos], summary: 'Detalhe com avaliação de risco e fontes', responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/Error' } } }
+  /ips/{ip}:
+    get:
+      tags: [Eventos]
+      summary: Perfil e linha do tempo de um IP (IP validado). `rdap=true` consulta RDAP sob demanda
+      parameters:
+        - { name: ip, in: path, required: true, schema: { type: string } }
+        - { name: rdap, in: query, schema: { type: string, enum: ['true', 'false'], default: 'false' } }
+      responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/Error' } }
+  /dashboard/summary:
+    get: { tags: [Dashboard], summary: KPIs do período, parameters: [{ $ref: '#/components/parameters/Period' }], responses: { '200': { description: OK } } }
+  /dashboard/timeseries:
+    get: { tags: [Dashboard], summary: Requisições por intervalo, parameters: [{ $ref: '#/components/parameters/Period' }], responses: { '200': { description: OK } } }
+  /alerts:
+    get:
+      tags: [Alertas]
+      summary: Lista alertas
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [open, investigating, resolved] } }
+        - { name: severity, in: query, schema: { type: string, enum: [info, low, medium, high, critical] } }
+        - { name: type, in: query, schema: { type: string } }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Cursor' }
+      responses: { '200': { description: OK } }
+  /alerts/{id}:
+    patch:
+      tags: [Alertas]
+      summary: Altera o estado da investigação
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [status], properties: { status: { type: string, enum: [open, investigating, resolved] } } } } } }
+      responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/Error' } }
+  /exports:
+    get: { tags: [Exportações], summary: Exportações vigentes do admin, responses: { '200': { description: OK } } }
+    post:
+      tags: [Exportações]
+      summary: Cria exportação assíncrona (exige reautenticação recente; IP mascarado por padrão)
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateExport' } } } }
+      responses: { '202': { description: Aceita }, '403': { description: reauth_required, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } } }
+  /exports/{id}:
+    get: { tags: [Exportações], summary: Estado da exportação, parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/Error' } } }
+  /exports/{id}/download:
+    get: { tags: [Exportações], summary: 'Baixa o arquivo (auditado; expira no TTL)', parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { description: CSV ou JSON }, '409': { $ref: '#/components/responses/Error' } } }
+  /integrations/status:
+    get: { tags: [Sistema], summary: 'Provedores, cotas, circuitos e jobs (sem segredos)', responses: { '200': { description: OK } } }
+  /settings:
+    get: { tags: [Sistema], summary: 'Configurações seguras (retenção é somente leitura)', responses: { '200': { description: OK } } }
+  /audit:
+    get: { tags: [Sistema], summary: Auditoria administrativa, parameters: [{ name: action, in: query, schema: { type: string } }, { $ref: '#/components/parameters/Limit' }, { $ref: '#/components/parameters/Cursor' }], responses: { '200': { description: OK } } }
+x-public-routes:
+  note: Rotas do domínio de links (fora de /api/v1)
+  routes:
+    - 'GET /{slug} -> 302 Location, Cache-Control no-store; 404 idêntico para inexistente/desativado/expirado/removido; 503 se o banco cair e o link não estiver em cache'
+    - 'HEAD /{slug} -> mesmo comportamento sem corpo; classificado como head_probe (não é clique humano)'
+    - 'GET /privacy -> aviso de privacidade (HTML)'
+    - 'GET /robots.txt -> Disallow: /'
+    - 'GET /healthz, /readyz, /metrics -> internos (não expostos pelo Caddy)'
+components:
+  securitySchemes:
+    sessionCookie: { type: apiKey, in: cookie, name: iplc_session, description: 'Em produção o cookie chama-se __Host-iplc_session. Mutações exigem também X-CSRF-Token.' }
+  parameters:
+    Csrf: { name: X-CSRF-Token, in: header, required: true, schema: { type: string }, description: 'Valor retornado por /auth/me ou /auth/totp/verify' }
+    Id: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    Limit: { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200 } }
+    Cursor: { name: cursor, in: query, schema: { type: string } }
+    Period: { name: period, in: query, schema: { type: string, enum: ['24h', '7d', '30d'], default: 24h } }
+  responses:
+    Error: { description: Erro, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: object, required: [code, message], properties: { code: { type: string }, message: { type: string }, details: { type: array, items: { type: object } } } }
+    RiskLevel: { type: string, enum: [low, medium, high, not_evaluated] }
+    LoginRequest: { type: object, required: [email, password], properties: { email: { type: string, format: email }, password: { type: string } } }
+    LoginResponse: { type: object, properties: { challenge: { type: string }, mfaSetupPending: { type: boolean } } }
+    VerifyRequest: { type: object, required: [challenge, code], properties: { challenge: { type: string }, code: { type: string, description: 'TOTP de 6 dígitos ou código de recuperação' } } }
+    Session: { type: object, properties: { email: { type: string }, csrfToken: { type: string }, usedRecoveryCode: { type: boolean } } }
+    CreateLink:
+      type: object
+      required: [targetUrl]
+      properties:
+        slug: { type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9_-]{2,63}$' }
+        label: { type: [string, 'null'], maxLength: 200 }
+        targetUrl: { type: string, maxLength: 2048 }
+        expiresAt: { type: [string, 'null'], format: date-time }
+    PatchLink: { type: object, properties: { label: { type: [string, 'null'] }, targetUrl: { type: string }, expiresAt: { type: [string, 'null'], format: date-time }, isActive: { type: boolean } } }
+    Link:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        publicUrl: { type: string }
+        targetUrl: { type: string }
+        label: { type: [string, 'null'] }
+        isActive: { type: boolean }
+        expiresAt: { type: [string, 'null'], format: date-time }
+        status: { type: string, enum: [active, inactive, expired, deleted] }
+        metrics: { type: object, properties: { requests: { type: integer }, uniqueIps: { type: integer }, lastAccessAt: { type: [string, 'null'], format: date-time } } }
+    LinkPage: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/Link' } }, nextCursor: { type: [string, 'null'] } } }
+    Event:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        shortLinkId: { type: [string, 'null'] }
+        slug: { type: string }
+        occurredAt: { type: string, format: date-time }
+        ipAddress: { type: string }
+        method: { type: string }
+        httpStatus: { type: integer }
+        clientClass: { type: string }
+        geo: { type: object, properties: { country: { type: [string, 'null'] }, region: { type: [string, 'null'] }, city: { type: [string, 'null'] }, asn: { type: [integer, 'null'] }, asnOrg: { type: [string, 'null'] } } }
+        enrichmentStatus: { type: string }
+        risk: { type: object, properties: { score: { type: [integer, 'null'] }, level: { $ref: '#/components/schemas/RiskLevel' } } }
+    EventPage: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/Event' } }, nextCursor: { type: [string, 'null'] } } }
+    CreateExport:
+      type: object
+      required: [format]
+      properties:
+        format: { type: string, enum: [csv, json] }
+        filters: { type: object, description: 'Mesmos filtros de /events' }
+        fullIp: { type: boolean, default: false, description: 'false = IP mascarado (IPv4 /24, IPv6 /48)' }

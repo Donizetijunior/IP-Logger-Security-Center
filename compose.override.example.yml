@@ -1,0 +1,15 @@
+# Exemplo de overrides locais: cp compose.override.example.yml compose.override.yml
+# (o Compose carrega compose.override.yml automaticamente; NÃO versionar o arquivo real)
+services:
+  # Expor a API localmente para depuração (NUNCA em produção)
+  api:
+    ports:
+      - "127.0.0.1:3000:3000"
+  # Acessar o Postgres da máquina local apenas via loopback
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+  # Mais logs durante o desenvolvimento
+  worker:
+    environment:
+      LOG_LEVEL: debug
