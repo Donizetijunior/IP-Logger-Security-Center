@@ -62,7 +62,7 @@
 		path /
 	}
 	handle @landing {
-		header -X-Robots-Tag
+		header X-Robots-Tag "index, follow"
 		header Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 		header Cache-Control "public, max-age=300"
 		rewrite * /landing/index.html
