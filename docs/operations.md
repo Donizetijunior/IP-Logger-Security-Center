@@ -17,12 +17,15 @@ Logs são JSON em stdout com rotação (`json-file`, 10 MB × 5). **Não contêm
 
 ## Backup e restauração
 
-- **Backup** (cron diário no host): `BACKUP_KEY_FILE=/root/.iplogger-backup.key ./infra/scripts/backup.sh` — `pg_dump -Fc` criptografado com AES-256 (PBKDF2), `sha256`, permissões `600` e **exclusão de cópias com mais de `BACKUP_RETENTION_DAYS` (30)**, para que dados vencidos não vivam indefinidamente em backups.
-- Guarde `BACKUP_KEY_FILE` **fora do servidor** (cofre). Sem ela o backup é irrecuperável.
-- **RPO** alvo: 24 h (backup diário). **RTO** alvo: < 1 h (restauração + subida), a validar no seu ambiente.
-- **Restauração**: `BACKUP_KEY_FILE=… ./infra/scripts/restore.sh backups/iplogger-<data>.dump.enc`. O script verifica o hash, **para api/worker/caddy**, restaura, **executa o expurgo de retenção antes de reabrir as consultas** (CA-18) e só então sobe os serviços.
-- Faça um **teste de restauração periódico** (ao menos trimestral) em ambiente separado.
-- Cópias fora do servidor (rsync/S3) são responsabilidade do operador e devem respeitar a mesma retenção.
+- **Backup diário automático:** o cron do servidor roda  às **03:30 UTC** (00:30 em Brasília):  criptografado com AES-256 (PBKDF2), , permissão  e **exclusão de cópias com mais de 14 dias**. Destino: ; log em  na mesma pasta.
+- **Trava de disco:** o backup **aborta** (código 2) se o destino tiver menos de  (padrão 5 GB) livres, para nunca encher o disco de um servidor compartilhado com outros projetos.
+- **Tamanho:** ~43–150 bytes por evento comprimido; ~600 bytes por evento no banco (medido com 100 mil eventos). Até ~100 mil acessos/dia os 14 backups ocupam ~6 GB.
+- **Chave:**  (600) no servidor **e uma cópia fora dele** (guarde em gerenciador de senhas). Sem a chave os backups são irrecuperáveis; com a chave e o arquivo qualquer pessoa os abre — trate os dois como segredos.
+- **Cópia fora do servidor:** os backups ficam no mesmo disco do banco, então **não protegem contra perda do servidor**. Copie periodicamente  para outro lugar (ex.: / para seu computador), respeitando a retenção.
+- **Verificar um backup sem tocar na produção:**  descriptografa, confere o hash, restaura em um banco temporário , compara contagens e o remove. Rode após mudanças no esquema e ao menos uma vez por mês.
+- **RPO** alvo: 24 h. **RTO** alvo: < 1 h.
+- **Restauração**: . Verifica o hash, **para api/worker/caddy**, restaura, **executa o expurgo de retenção antes de reabrir as consultas** (CA-18) e só então sobe os serviços.
+- Os scripts leem o  sem executá-lo (valores com espaços/parênteses são válidos para o Docker e quebrariam um ).
 
 ## Expurgo (retenção de 30 dias)
 
