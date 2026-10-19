@@ -137,7 +137,7 @@ export function App() {
     );
   }
 
-  const nav = me.role === 'admin' ? NAV_ADMIN : NAV_USER;
+  const nav = (me.role === 'admin' ? NAV_ADMIN : NAV_USER).filter((n) => n.to !== '/dominios' || me.customDomains !== false);
   const admin = me.role === 'admin';
 
   return (

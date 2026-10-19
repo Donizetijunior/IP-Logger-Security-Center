@@ -117,6 +117,7 @@ export function registerAdmin(app: FastifyInstance, ctx: Ctx): void {
 
     priv.get('/auth/me', async (req) => ({
       authenticated: true, id: req.session!.accountId, email: req.session!.email, role: req.session!.role, mustChangePassword: req.session!.mustChangePassword,
+      customDomains: config.customDomainsEmails.length === 0 || config.customDomainsEmails.includes(req.session!.email.toLowerCase()),
       linkQuota: req.session!.linkQuota, csrfToken: req.session!.csrfToken,
     }));
 

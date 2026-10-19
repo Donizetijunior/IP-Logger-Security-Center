@@ -64,9 +64,16 @@ export function registerDomains(app: FastifyInstance, ctx: Ctx): void {
     if (domainId) linkCache.invalidateDomain(domainId);
   };
 
+  /** Com CUSTOM_DOMAINS_EMAILS definida, só essas contas usam o recurso (as demais não o enxergam). */
+  const allowed = (s: { email: string }) => config.customDomainsEmails.length === 0 || config.customDomainsEmails.includes(s.email.toLowerCase());
+  const guard = (req: { session?: { email: string } | null }) => {
+    if (!allowed(req.session!)) throw new HttpError(403, 'domains_not_allowed', 'Domínios personalizados não estão disponíveis para esta conta');
+  };
+
   app.get('/domains', async (req) => {
     const s = req.session!;
     const admin = s.role === 'admin';
+    if (!allowed(s)) return { items: [], policy: { mode: config.CUSTOM_DOMAINS_MODE, canCreate: false, max: 0, used: 0, available: false } };
     const { rows } = await pool.query<DomainRow>(
       `SELECT d.*, a.email AS owner_email,
               (SELECT count(*)::int FROM short_links l WHERE l.domain_id = d.id AND l.deleted_at IS NULL) AS links
@@ -87,6 +94,7 @@ export function registerDomains(app: FastifyInstance, ctx: Ctx): void {
   });
 
   app.post('/domains', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req, reply) => {
+    guard(req);
     const s = req.session!;
     const admin = s.role === 'admin';
     if (!admin && config.CUSTOM_DOMAINS_MODE === 'admin') {
@@ -127,6 +135,7 @@ export function registerDomains(app: FastifyInstance, ctx: Ctx): void {
 
   /** Verifica a propriedade (TXT no DNS) e a chegada do tráfego (checagem de roteamento). */
   app.post('/domains/:id/verify', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req) => {
+    guard(req);
     const { id } = idParam.parse(req.params);
     let d = await loadOwned(req, id);
     if (d.status === 'disabled') throw new HttpError(409, 'domain_disabled', 'Domínio desativado pelo administrador.');
@@ -178,6 +187,7 @@ export function registerDomains(app: FastifyInstance, ctx: Ctx): void {
   });
 
   app.patch('/domains/:id', async (req) => {
+    guard(req);
     const { id } = idParam.parse(req.params);
     const body = patchBody.parse(req.body);
     const d = await loadOwned(req, id);
@@ -208,6 +218,7 @@ export function registerDomains(app: FastifyInstance, ctx: Ctx): void {
   });
 
   app.delete('/domains/:id', async (req) => {
+    guard(req);
     const { id } = idParam.parse(req.params);
     const d = await loadOwned(req, id);
     if ((d.links ?? 0) > 0) {
