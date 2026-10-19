@@ -79,7 +79,8 @@ export class GeoService {
     } catch (err) {
       error = (err as Error).message.slice(0, 200);
     }
-    const src = describeSource(this.cityPath ?? asnPath);
+    // Mesmo em estado de erro, informa qual base foi tentada (e a atribuição correspondente)
+    const src = describeSource(this.cityPath ?? cityPath ?? asnPath);
     await this.report(pool, {
       state: error ? 'error' : this.city || this.asn ? 'ready' : 'missing_databases',
       city: !!this.city,
