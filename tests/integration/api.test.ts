@@ -107,7 +107,7 @@ describe('autenticação (CA-12, CA-13)', () => {
   });
 
   it('bloqueia a conta após falhas repetidas e audita sem credenciais', async () => {
-    await t.ctx.pool.query('UPDATE admins SET failed_logins = 0, locked_until = NULL');
+    await t.ctx.pool.query('UPDATE accounts SET failed_logins = 0, locked_until = NULL');
     for (let i = 0; i < 5; i++) {
       await t.app.inject({
         method: 'POST', url: '/api/v1/auth/login', headers: { host: DASH_HOST }, payload: { email: ADMIN_EMAIL, password: 'errada-errada-1A!' }, remoteAddress: `198.51.100.${20 + i}`,
@@ -120,7 +120,7 @@ describe('autenticação (CA-12, CA-13)', () => {
     const { rows } = await t.ctx.pool.query("SELECT metadata_redacted::text AS m FROM audit_events WHERE action = 'auth.login' AND result = 'failure'");
     expect(rows.length).toBeGreaterThan(0);
     for (const r of rows) expect(r.m).not.toContain('errada');
-    await t.ctx.pool.query('UPDATE admins SET failed_logins = 0, locked_until = NULL');
+    await t.ctx.pool.query('UPDATE accounts SET failed_logins = 0, locked_until = NULL');
   });
 });
 

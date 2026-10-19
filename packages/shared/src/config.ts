@@ -62,6 +62,11 @@ const schema = z.object({
   AUDIT_RETENTION_DAYS: int(365),
   LEGAL_REVIEW_ACKNOWLEDGED: bool.default(false),
   COOKIE_SECURE: bool.optional(),
+  /** open = cadastro livre; approval = exige aprovação do admin; closed = sem cadastro público. */
+  SIGNUP_MODE: z.enum(['open', 'approval', 'closed']).default('approval'),
+  DEFAULT_LINK_QUOTA: int(25),
+  SIGNUP_RATE_PER_HOUR: int(5),
+  OPEN_SOURCE_URL: z.string().default('https://github.com/Donizetijunior/IP-Logger-Security-Center'),
   PRIVACY_CONTROLLER_NAME: z.string().default('A DEFINIR PELO CONTROLADOR'),
   PRIVACY_CONTACT_EMAIL: z.string().default('A DEFINIR'),
 });
@@ -79,6 +84,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     const v = readEnvSecret(env, k);
     if (v !== undefined) merged[k] = v;
   }
+  // Variáveis definidas como vazias (ex.: COOKIE_SECURE= no Compose) equivalem a não definidas
+  for (const k of Object.keys(merged)) if (merged[k] === '') delete merged[k];
   const parsed = schema.safeParse(merged);
   if (!parsed.success) {
     const msg = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');

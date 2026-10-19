@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
+import { useSession } from '../session';
 import { Card, ErrorBox, PageHeader, Spinner, Time, useAsync } from '../ui';
 import type { SeriesPoint, Summary } from '../types';
 
@@ -78,12 +79,13 @@ function TimeSeries({ points, period }: { points: SeriesPoint[]; period: string 
 }
 
 export function OverviewPage() {
+  const { me } = useSession();
   const [period, setPeriod] = useState('24h');
   const summary = useAsync(() => api.get<Summary>(`/dashboard/summary?period=${period}`), [period]);
   const series = useAsync(() => api.get<{ points: SeriesPoint[] }>(`/dashboard/timeseries?period=${period}`), [period]);
   const s = summary.data;
   const openAlerts = s ? Object.values(s.openAlerts).reduce((a, b) => a + b, 0) : 0;
-  const hbStale = s && (!s.workerHeartbeatAt || Date.now() - Date.parse(s.workerHeartbeatAt) > 180_000);
+  const hbStale = s && me.role === 'admin' && (!s.workerHeartbeatAt || Date.now() - Date.parse(s.workerHeartbeatAt) > 180_000);
 
   return (
     <>

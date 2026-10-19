@@ -24,6 +24,7 @@ services:
       - "${HTTPS_PORT:-443}:443"
     environment:
       ACME_EMAIL: ${ACME_EMAIL:-admin@example.invalid}
+      TUNNEL_IP: ${IPLC_TUNNEL_IP:-172.30.0.249}
       LINKS_SITE: ${LINKS_SITE:?defina LINKS_SITE}
       PANEL_SITE: ${PANEL_SITE:?defina PANEL_SITE}
     volumes:
@@ -49,6 +50,7 @@ services:
       NODE_ENV: ${NODE_ENV:-production}
       API_PORT: "3000"
       TRUSTED_PROXY_CIDRS: ${IPLC_CADDY_IP:-172.30.0.250}/32
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
       DATABASE_URL: postgresql://${POSTGRES_USER:-iplogger}:${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-iplogger}
       REDIS_URL: redis://:${REDIS_PASSWORD:?defina REDIS_PASSWORD}@redis:6379
     depends_on:
@@ -119,6 +121,23 @@ services:
       timeout: 3s
       retries: 20
     mem_limit: 320m
+
+  # Cloudflare Tunnel (opcional): publica o Caddy sem abrir portas no roteador.
+  # docker compose --profile tunnel up -d cloudflared  (requer CLOUDFLARE_TUNNEL_TOKEN no .env)
+  # No painel Zero Trust, aponte os hostnames públicos para o serviço HTTP http://caddy:80
+  cloudflared:
+    <<: *hardening
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:2026.10.1@sha256:a15a3b50b8dabd57ac2090e9484c0247dba9dfa1f0df4d298d4317f9d69eb2d5
+    command: ["tunnel", "--no-autoupdate", "--metrics", "0.0.0.0:2000", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      caddy: { condition: service_started }
+    networks:
+      iplc:
+        ipv4_address: ${IPLC_TUNNEL_IP:-172.30.0.249}
+    mem_limit: 128m
 
   # Atualização das bases GeoLite2 (opcional): docker compose --profile geoip up -d geoipupdate
   geoipupdate:

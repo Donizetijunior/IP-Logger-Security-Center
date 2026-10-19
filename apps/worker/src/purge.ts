@@ -64,6 +64,8 @@ export async function runPurge(pool: Pool, opts: { retentionDays: number; auditR
   )).rowCount ?? 0;
   d.telemetry_counters = (await pool.query(`DELETE FROM telemetry_counters WHERE bucket < now() - interval '90 days'`)).rowCount ?? 0;
   d.provider_quota = (await pool.query(`DELETE FROM provider_quota WHERE window_start < (now() - interval '90 days')::date`)).rowCount ?? 0;
+  // Denúncias resolvidas contêm contato do denunciante: guarda por 180 dias
+  d.abuse_reports = (await pool.query("DELETE FROM abuse_reports WHERE resolved_at < now() - interval '180 days'")).rowCount ?? 0;
   d.audit_events = (await pool.query(`DELETE FROM audit_events WHERE at < now() - ($1 || ' days')::interval`, [String(opts.auditRetentionDays)])).rowCount ?? 0;
 
   const result: PurgeResult = { at: new Date().toISOString(), retentionDays: opts.retentionDays, cutoff: cutoff.toISOString(), deleted: d };

@@ -1,6 +1,6 @@
 # IP Logger Security Center
 
-Encurtador **privado** de URLs com registro de acessos, enriquecimento assíncrono de IPs e dashboard de Cybersecurity / Threat Intelligence, para **investigação de segurança autorizada**. Um único administrador, sem cadastro público.
+Plataforma de links curtos com registro de acessos, enriquecimento assíncrono de IPs e dashboard de Cybersecurity / Threat Intelligence, para **investigação de segurança autorizada**. **Multiusuário**: cada pessoa vê somente os próprios links; um administrador gerencia usuários e moderação. Cadastro público configurável (`open` / `approval` / `closed`) — ver [docs/multiuser.md](docs/multiuser.md).
 
 > **Status:** MVP implementado e testado (ver [checklist de aceite](docs/acceptance-checklist.md)). **Go-live bloqueado** até a decisão jurídica sobre guarda de registros de acesso (Lei 12.965/2014, art. 15) e a base legal de tratamento serem documentadas — ver [docs/privacy-retention.md](docs/privacy-retention.md). Em `NODE_ENV=production` a aplicação **recusa iniciar** sem `LEGAL_REVIEW_ACKNOWLEDGED=true`.
 
@@ -11,6 +11,7 @@ Encurtador **privado** de URLs com registro de acessos, enriquecimento assíncro
 - Enriquece **em background** (nunca no caminho do redirect): GeoLite2/ASN local, DNS reverso, lista de saídas Tor, AbuseIPDB e GreyNoise Community (opt-in), RDAP sob demanda.
 - Calcula um **risk score explicável e versionado** (regra, peso, valor, fonte, horário) e gera alertas internos (somente no painel).
 - Painel em pt-BR: visão geral, links, eventos com filtros, detalhe do evento, investigação de IP, alertas, saúde das integrações, auditoria.
+- **Contas:** cadastro público, Termos de Uso, troca/exclusão de conta, gestão de usuários pelo admin, cotas por conta e **denúncia pública de abuso** com moderação.
 - Exporta CSV/JSON com reautenticação, IP mascarado por padrão, TTL curto e auditoria.
 - Expurga automaticamente eventos identificáveis após **30 dias**.
 
@@ -61,9 +62,14 @@ tests/        integration, security, e2e, load
 docs/         arquitetura, API (OpenAPI), TI, risco, privacidade, operação, ADRs
 ```
 
+## Código aberto
+
+Veja [docs/open-source.md](docs/open-source.md) (escolha de licença, o que nunca versionar e como proteger o serviço hospedado).
+
 ## Limitações conhecidas (leia antes de usar)
 
 - Geolocalização e reputação referem-se ao **endereço de rede** (NAT/VPN/CGNAT), não a uma pessoa.
 - Adaptadores AbuseIPDB/GreyNoise e GeoLite2 foram validados **apenas com simulações HTTP / sem bases reais** (não havia chaves); valide com credenciais próprias antes de depender deles ([docs/threat-intelligence.md](docs/threat-intelligence.md)).
 - Instância única de API (cache de links em memória). Para escalar horizontalmente é preciso invalidar o cache de forma compartilhada.
+- O cadastro `open` **não verifica e-mail** (sem SMTP) e não há CAPTCHA: leia o aviso de abuso em [docs/multiuser.md](docs/multiuser.md#risco-de-abuso-leitura-obrigatória-antes-de-abrir-ao-público).
 - Medições de desempenho foram feitas em Docker Desktop (Windows), não na VPS de referência.

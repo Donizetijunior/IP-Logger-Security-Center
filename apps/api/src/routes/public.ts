@@ -26,6 +26,9 @@ export function renderPrivacyPage(ctx: Ctx): string {
 <h2>Quem é o controlador</h2>
 <p>${esc(config.PRIVACY_CONTROLLER_NAME)}. Contato para exercício de direitos do titular: ${esc(config.PRIVACY_CONTACT_EMAIL)}.</p>
 
+<h2>Quem cria os links</h2>
+<p>Esta plataforma é aberta a usuários cadastrados, que aceitam Termos de Uso e <strong>são responsáveis pelos links que criam</strong>. O uso para rastrear pessoas sem autorização ou consentimento é proibido. Se você recebeu um link e acredita que foi usado indevidamente, <a href="${esc(config.PUBLIC_DASHBOARD_URL)}/denunciar">denuncie aqui</a> (sem login e sem registrar o seu IP).</p>
+
 <h2>Finalidade</h2>
 <p>Os links encurtados deste domínio registram eventos de acesso para fins de <strong>segurança da informação e investigação de incidentes</strong> (por exemplo, identificar automação, varreduras e abuso). Não há página intermediária: o redirecionamento ocorre imediatamente.</p>
 
@@ -61,5 +64,13 @@ export function registerPublic(app: FastifyInstance, ctx: Ctx): void {
       .header('cache-control', 'public, max-age=300')
       .send(renderPrivacyPage(ctx)),
   );
+  // Raiz do domínio de links: leva à plataforma (não há link no caminho vazio)
+  app.get('/', async (req, reply) => {
+    const host = (req.headers.host ?? '').toLowerCase();
+    if (host === ctx.config.shortHost && ctx.config.shortHost !== ctx.config.dashboardHost) {
+      return reply.redirect(ctx.config.PUBLIC_DASHBOARD_URL, 302);
+    }
+    return reply.code(404).send({ error: { code: 'not_found', message: 'Não encontrado' } });
+  });
   app.get('/robots.txt', async (_req, reply) => reply.type('text/plain').send('User-agent: *\nDisallow: /\n'));
 }

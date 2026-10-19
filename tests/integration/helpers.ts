@@ -35,7 +35,7 @@ export function testEnv(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
 
 export async function resetDatabase(pool: Pool): Promise<void> {
   await migrate(pool);
-  await pool.query(`TRUNCATE admins, short_links, access_events, ip_intelligence, alerts, audit_events, outbox_events,
+  await pool.query(`TRUNCATE accounts, short_links, access_events, ip_intelligence, alerts, audit_events, outbox_events,
     telemetry_counters, provider_quota, job_state, tor_exit_nodes, exports, risk_assessments CASCADE`);
 }
 
@@ -111,4 +111,32 @@ export async function makeLink(t: TestApp, s: Session, payload: Record<string, u
 
 export function newPool(): Pool {
   return createPool(TEST_DATABASE_URL, { max: 3 });
+}
+
+export const USER_PASSWORD = 'Usuario-Forte-#2026-ab';
+let ipCounter = 10;
+/** IP de documentação único por chamada, para não esbarrar nos limites de taxa por IP. */
+export const nextIp = () => `198.51.100.${(ipCounter = (ipCounter % 240) + 1)}`;
+
+export async function signup(t: TestApp, email: string, password = USER_PASSWORD, acceptTerms: unknown = true) {
+  return t.app.inject({
+    method: 'POST', url: '/api/v1/auth/signup', headers: { host: DASH_HOST }, remoteAddress: nextIp(),
+    payload: { email, password, acceptTerms },
+  });
+}
+
+/** Login de conta sem MFA (usuário comum): uma única chamada cria a sessão. */
+export async function loginUser(t: TestApp, email: string, password = USER_PASSWORD): Promise<Session> {
+  const r = await t.app.inject({
+    method: 'POST', url: '/api/v1/auth/login', headers: { host: DASH_HOST }, remoteAddress: nextIp(), payload: { email, password },
+  });
+  if (r.statusCode !== 200 || r.json().mfaRequired) throw new Error(`login de usuário falhou: ${r.statusCode} ${r.body}`);
+  const c = r.cookies[0]!;
+  const cookie = `${c.name}=${c.value}`;
+  const csrf = r.json().csrfToken as string;
+  return { cookie, csrf, headers: (extra = {}) => ({ host: DASH_HOST, cookie, 'x-csrf-token': csrf, ...extra }) };
+}
+
+export async function visit(t: TestApp, slug: string, ip: string, ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36') {
+  return t.app.inject({ method: 'GET', url: `/${slug}`, headers: { host: SHORT_HOST, 'user-agent': ua }, remoteAddress: ip });
 }

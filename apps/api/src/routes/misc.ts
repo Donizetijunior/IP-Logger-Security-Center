@@ -2,12 +2,13 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { DEFAULT_RISK_CONFIG, RISK_ENGINE_VERSION } from '@ipl/shared';
 import type { Ctx } from '../context.ts';
-import { decodeCursor, encodeCursor, iso } from '../util.ts';
+import { decodeCursor, encodeCursor, iso, requireAdmin } from '../util.ts';
 
 export function registerMisc(app: FastifyInstance, ctx: Ctx): void {
   const { pool, config } = ctx;
 
-  app.get('/integrations/status', async () => {
+  app.get('/integrations/status', async (req) => {
+    requireAdmin(req);
     const [quota, stats, jobs] = await Promise.all([
       pool.query<{ source: string; used: number }>(
         'SELECT source, used FROM provider_quota WHERE window_start = (now() AT TIME ZONE \'UTC\')::date',
@@ -55,7 +56,9 @@ export function registerMisc(app: FastifyInstance, ctx: Ctx): void {
     };
   });
 
-  app.get('/settings', async () => ({
+  app.get('/settings', async (req) => {
+    requireAdmin(req);
+    return {
     retentionDays: config.ANALYTICS_RETENTION_DAYS,
     retentionReadOnly: true,
     auditRetentionDays: config.AUDIT_RETENTION_DAYS,
@@ -68,7 +71,10 @@ export function registerMisc(app: FastifyInstance, ctx: Ctx): void {
     legalReviewAcknowledged: config.LEGAL_REVIEW_ACKNOWLEDGED,
     risk: { engineVersion: RISK_ENGINE_VERSION, config: DEFAULT_RISK_CONFIG },
     failOpenPolicy: 'Se o banco ficar indisponível, o redirect continua (fail-open) usando o cache de links; a perda de telemetria é contabilizada.',
-  }));
+    signupMode: config.SIGNUP_MODE,
+    defaultLinkQuota: config.DEFAULT_LINK_QUOTA,
+  };
+  });
 
   const auditQuery = z.object({
     limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -77,6 +83,7 @@ export function registerMisc(app: FastifyInstance, ctx: Ctx): void {
   });
 
   app.get('/audit', async (req) => {
+    requireAdmin(req);
     const q = auditQuery.parse(req.query);
     const params: unknown[] = [];
     const where: string[] = [];
@@ -87,15 +94,15 @@ export function registerMisc(app: FastifyInstance, ctx: Ctx): void {
       where.push(`(at, id) < ($${params.length - 1}::timestamptz, $${params.length}::uuid)`);
     }
     params.push(q.limit + 1);
-    const { rows } = await pool.query<{ id: string; admin_id: string | null; action: string; resource: string | null; result: string; at_raw: string; metadata_redacted: unknown }>(
-      `SELECT id, admin_id, action, resource, result, to_char(at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at_raw, metadata_redacted
+    const { rows } = await pool.query<{ id: string; account_id: string | null; action: string; resource: string | null; result: string; at_raw: string; metadata_redacted: unknown }>(
+      `SELECT id, account_id, action, resource, result, to_char(at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at_raw, metadata_redacted
        FROM audit_events ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY at DESC, id DESC LIMIT $${params.length}`,
       params,
     );
     const page = rows.slice(0, q.limit);
     const last = page[page.length - 1];
     return {
-      items: page.map((r) => ({ id: r.id, adminId: r.admin_id, action: r.action, resource: r.resource, result: r.result, at: r.at_raw, metadata: r.metadata_redacted })),
+      items: page.map((r) => ({ id: r.id, accountId: r.account_id, action: r.action, resource: r.resource, result: r.result, at: r.at_raw, metadata: r.metadata_redacted })),
       nextCursor: rows.length > q.limit && last ? encodeCursor({ t: last.at_raw, id: last.id }) : null,
     };
   });

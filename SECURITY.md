@@ -17,6 +17,11 @@ Não abra issue pública. Envie os detalhes (passos, impacto, versão) ao respon
 | XSS | SPA React (escape por padrão), CSP restritiva no painel, `/privacy` com escape e CSP `default-src 'none'` |
 | Exposição de serviços internos | Apenas Caddy publica portas; Postgres/Redis só na rede Docker; `/metrics`, `/readyz`, `/healthz` bloqueados no Caddy e recusados via proxy |
 | Vazamento de segredos | Segredos em `.env` (600) ou `*_FILE`; valores `CHANGE_ME` rejeitados em produção; chaves de API e TOTP nunca retornam pela API (testado); segredo TOTP cifrado com AES-256-GCM |
+| Acesso a dados de outro usuário (multi-tenant) | Escopo por dono aplicado no SQL de links, eventos, IPs, painel, alertas e exportações; rotas administrativas exigem papel admin; testes de isolamento (`tests/integration/multiuser.test.ts`) |
+| Cadastro em massa / spam | Limite de cadastros por IP, cota de links por conta, modo `approval`, suspensão e remoção de contas; **sem** verificação de e-mail/CAPTCHA (pendente) |
+| Elevação de privilégio | O papel nunca vem do cliente; índice único garante uma só conta admin; admin só é criado por CLI; conta admin protegida nas rotas de usuários |
+| Reativação de link moderado pelo dono | `moderation_disabled` impede reativação por usuários comuns |
+| IP forjado atrás do Cloudflare | `CF-Connecting-IP` só é aceito quando a conexão vem do contêiner do túnel (IP fixo); caso contrário é descartado |
 | Abuso de volume | Rate limit por IP no redirect (generoso, configurável); telemetria de bloqueios sem PII |
 | Falha de dependências | *Fail-open* do redirect com métrica e alerta; outbox transacional; circuit breaker nos provedores |
 | Injeção em exportações | Neutralização de fórmulas CSV (`=`, `+`, `-`, `@`), IP mascarado por padrão, reautenticação, TTL e auditoria |
@@ -31,6 +36,7 @@ Sem coleta oculta, *fingerprinting*, varredura ativa de visitantes, bloqueio aut
 
 ## Pendências de segurança conhecidas
 
-- Troca de senha/rotação do admin pelo painel não existe no MVP (procedimento manual em [docs/operations.md](docs/operations.md)).
+- Troca de senha **de usuários** existe; do **admin** ainda é manual ([docs/operations.md](docs/operations.md)). Usuários comuns não têm MFA.
+- Cadastro aberto sem verificação de e-mail/CAPTCHA ([docs/multiuser.md](docs/multiuser.md)).
 - O token CSRF é armazenado em texto na sessão (não é segredo contra o banco; o cookie de sessão é guardado apenas em hash).
 - Execute `npm audit` e atualize imagens periodicamente; faça um *pentest* independente antes de operar com dados reais.

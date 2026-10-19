@@ -3,6 +3,7 @@ info:
   title: IP Logger Security Center API
   version: 0.1.0
   description: |
+    Contas: administrador (MFA) e usuários comuns (isolados por dono dos links). Cadastro conforme SIGNUP_MODE.
     API REST administrativa (`/api/v1`, autenticada por cookie de sessão + CSRF) e rotas públicas.
     Erros seguem `{ "error": { "code": string, "message": string, "details"?: [...] } }`.
     Paginação por cursor opaco (`nextCursor`). Timestamps ISO 8601 em UTC.
@@ -17,6 +18,8 @@ tags:
   - { name: Alertas }
   - { name: Exportações }
   - { name: Sistema }
+  - { name: Usuários }
+  - { name: Moderação }
   - { name: Público }
 security:
   - sessionCookie: []
@@ -149,6 +152,44 @@ paths:
     get: { tags: [Sistema], summary: 'Configurações seguras (retenção é somente leitura)', responses: { '200': { description: OK } } }
   /audit:
     get: { tags: [Sistema], summary: Auditoria administrativa, parameters: [{ name: action, in: query, schema: { type: string } }, { $ref: '#/components/parameters/Limit' }, { $ref: '#/components/parameters/Cursor' }], responses: { '200': { description: OK } } }
+  /public/config:
+    get: { tags: [Público], security: [], summary: 'Configuração pública (modo de cadastro, links de código aberto/privacidade)', responses: { '200': { description: OK } } }
+  /auth/signup:
+    post:
+      tags: [Auth]
+      security: []
+      summary: 'Cadastro público (conforme SIGNUP_MODE; limite por IP; exige aceite dos Termos)'
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SignupRequest' } } } }
+      responses:
+        '201': { description: 'Criada (status active ou pending)' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { description: 'Cadastro fechado', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: 'E-mail já cadastrado', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: 'Limite de cadastros por IP', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /auth/change-password:
+    post: { tags: [Auth], summary: 'Troca a senha (encerra as outras sessões; aceita os Termos no primeiro acesso)', parameters: [{ $ref: '#/components/parameters/Csrf' }], requestBody: { required: true, content: { application/json: { schema: { type: object, required: [currentPassword, newPassword], properties: { currentPassword: { type: string }, newPassword: { type: string }, acceptTerms: { type: boolean } } } } } }, responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' } } }
+  /auth/delete-account:
+    post: { tags: [Auth], summary: 'Exclui a própria conta e todos os dados (usuário comum; confirma a senha)', parameters: [{ $ref: '#/components/parameters/Csrf' }], requestBody: { required: true, content: { application/json: { schema: { type: object, required: [password], properties: { password: { type: string } } } } } }, responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/Error' }, '401': { $ref: '#/components/responses/Error' } } }
+  /public/abuse-report:
+    post:
+      tags: [Público]
+      security: []
+      summary: 'Denúncia pública de link (sem login; o IP do denunciante não é registrado; 10/h por IP)'
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AbuseReport' } } } }
+      responses: { '201': { description: Registrada }, '400': { $ref: '#/components/responses/Error' }, '429': { $ref: '#/components/responses/Error' } }
+  /users:
+    get: { tags: [Usuários], summary: 'Lista contas (somente admin)', parameters: [{ name: q, in: query, schema: { type: string } }, { name: status, in: query, schema: { type: string, enum: [active, pending, suspended] } }, { $ref: '#/components/parameters/Limit' }, { $ref: '#/components/parameters/Cursor' }], responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Error' } } }
+    post: { tags: [Usuários], summary: 'Cria usuário (senha temporária devolvida uma única vez)', parameters: [{ $ref: '#/components/parameters/Csrf' }], requestBody: { required: true, content: { application/json: { schema: { type: object, required: [email], properties: { email: { type: string, format: email }, password: { type: string }, linkQuota: { type: integer, minimum: 0 } } } } } }, responses: { '201': { description: Criado }, '409': { $ref: '#/components/responses/Error' } } }
+  /users/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    patch: { tags: [Usuários], summary: 'Altera estado (active/pending/suspended) ou limite de links', parameters: [{ $ref: '#/components/parameters/Csrf' }], requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { status: { type: string, enum: [active, pending, suspended] }, linkQuota: { type: integer, minimum: 0 } } } } } }, responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } } }
+    delete: { tags: [Usuários], summary: 'Exclui usuário e todos os seus dados', parameters: [{ $ref: '#/components/parameters/Csrf' }], responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/Error' } } }
+  /users/{id}/reset-password:
+    post: { tags: [Usuários], summary: 'Gera senha temporária (encerra sessões; exige nova troca)', parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }], responses: { '200': { description: OK } } }
+  /reports:
+    get: { tags: [Moderação], summary: 'Fila de denúncias (somente admin)', parameters: [{ name: status, in: query, schema: { type: string, enum: [open, reviewing, link_disabled, dismissed] } }, { $ref: '#/components/parameters/Limit' }, { $ref: '#/components/parameters/Cursor' }], responses: { '200': { description: OK } } }
+  /reports/{id}:
+    patch: { tags: [Moderação], summary: 'Analisa a denúncia; pode desativar o link e suspender o dono', parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }], requestBody: { required: true, content: { application/json: { schema: { type: object, required: [status], properties: { status: { type: string, enum: [open, reviewing, link_disabled, dismissed] }, suspendOwner: { type: boolean } } } } } }, responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/Error' } } }
 x-public-routes:
   note: Rotas do domínio de links (fora de /api/v1)
   routes:
@@ -216,6 +257,8 @@ components:
         enrichmentStatus: { type: string }
         risk: { type: object, properties: { score: { type: [integer, 'null'] }, level: { $ref: '#/components/schemas/RiskLevel' } } }
     EventPage: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/Event' } }, nextCursor: { type: [string, 'null'] } } }
+    SignupRequest: { type: object, required: [email, password, acceptTerms], properties: { email: { type: string, format: email }, password: { type: string, minLength: 12 }, acceptTerms: { type: boolean, enum: [true] } } }
+    AbuseReport: { type: object, required: [slug, reason], properties: { slug: { type: string, description: "Código do link ou URL curta completa" }, reason: { type: string, enum: [tracking_without_consent, phishing_or_fraud, harassment, illegal_content, other] }, details: { type: string, maxLength: 2000 }, contact: { type: string, maxLength: 200 } } }
     CreateExport:
       type: object
       required: [format]

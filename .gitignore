@@ -10,3 +10,4 @@ backups/
 coverage/
 
 .demo-credentials.txt
+.server-credentials.txt

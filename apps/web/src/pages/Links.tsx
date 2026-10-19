@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { api, qs } from '../api';
+import { useSession } from '../session';
 import { Badge, Button, Card, Empty, ErrorBox, Field, PageHeader, Spinner, Time } from '../ui';
 import type { Link, Page } from '../types';
 
@@ -16,6 +17,7 @@ function toIsoOrNull(local: string): string | null {
 }
 
 export function LinksPage() {
+  const { me } = useSession();
   const [items, setItems] = useState<Link[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [q, setQ] = useState('');
@@ -84,7 +86,10 @@ export function LinksPage() {
 
   return (
     <>
-      <PageHeader title="Links" subtitle="Crie e gerencie os links curtos. O destino é validado no cadastro e novamente antes de cada redirecionamento." />
+      <PageHeader
+        title="Links"
+        subtitle={<>Crie e gerencie os links curtos. O destino é validado no cadastro e novamente antes de cada redirecionamento.{me.role !== 'admin' && me.linkQuota !== undefined && <> Seu limite: <strong>{me.linkQuota}</strong> links.</>}</>}
+      />
 
       <Card title="Novo link" className="mb-5">
         <form onSubmit={create} className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
@@ -123,6 +128,7 @@ export function LinksPage() {
                     <td>
                       <div className="mono break-all">{l.publicUrl}</div>
                       {l.label && <div className="text-xs" style={{ color: 'var(--muted)' }}>{l.label}</div>}
+                      {l.owner && <div className="text-xs" style={{ color: 'var(--muted)' }}>Dono: {l.owner.email}</div>}
                     </td>
                     <td className="max-w-xs break-all text-sm">{l.targetUrl}</td>
                     <td><Badge kind={STATUS[l.status].kind}>{STATUS[l.status].label}</Badge></td>

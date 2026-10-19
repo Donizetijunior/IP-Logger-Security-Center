@@ -15,6 +15,30 @@
 	}
 }
 
+(api_proxy) {
+	# Atrás do Cloudflare Tunnel o visitante vem em CF-Connecting-IP; só confiamos nesse cabeçalho quando
+	# a conexão chega do contêiner cloudflared (IP fixo na rede interna). Em qualquer outro caso o IP é o da conexão.
+	@tunnel remote_ip {$TUNNEL_IP:172.30.0.249}
+	route {
+		reverse_proxy @tunnel api:3000 {
+			header_up X-Forwarded-For {http.request.header.CF-Connecting-IP}
+			header_up -Forwarded
+			header_up -X-Real-IP
+			header_up -CF-Connecting-IP
+		}
+		reverse_proxy api:3000 {
+			header_up X-Forwarded-For {remote_host}
+			header_up -Forwarded
+			header_up -X-Real-IP
+			header_up -CF-Connecting-IP
+			transport http {
+				dial_timeout 3s
+				response_header_timeout 10s
+			}
+		}
+	}
+}
+
 # ----- Domínio dos links curtos (redirecionamento imediato) -----
 {$LINKS_SITE} {
 	import security_headers
@@ -29,15 +53,7 @@
 	}
 
 	handle {
-	reverse_proxy api:3000 {
-		header_up X-Forwarded-For {remote_host}
-		header_up -Forwarded
-		header_up -X-Real-IP
-		transport http {
-			dial_timeout 3s
-			response_header_timeout 10s
-		}
-	}
+		import api_proxy
 	}
 }
 
@@ -61,11 +77,7 @@
 
 	@api path /api/* /privacy
 	handle @api {
-		reverse_proxy api:3000 {
-			header_up X-Forwarded-For {remote_host}
-			header_up -Forwarded
-			header_up -X-Real-IP
-		}
+		import api_proxy
 	}
 	handle {
 		reverse_proxy web:8080

@@ -24,7 +24,7 @@ const get = (url: string, headers: Record<string, string> = {}, remoteAddress = 
 
 describe('injeção SQL', () => {
   it('parâmetros hostis em filtros/rotas não causam erro de banco nem vazam dados', async () => {
-    const payloads = ["' OR 1=1--", "'; DROP TABLE short_links;--", '1 UNION SELECT password_hash FROM admins'];
+    const payloads = ["' OR 1=1--", "'; DROP TABLE short_links;--", '1 UNION SELECT password_hash FROM accounts'];
     for (const p of payloads) {
       const enc = encodeURIComponent(p);
       const ev = await t.app.inject({ method: 'GET', url: `/api/v1/events?ip=${enc}`, headers: s.headers() });
@@ -39,7 +39,7 @@ describe('injeção SQL', () => {
     }
     const { rows } = await t.ctx.pool.query('SELECT count(*)::int AS n FROM short_links');
     expect(rows[0].n).toBeGreaterThanOrEqual(1);
-    const ad = await t.ctx.pool.query('SELECT count(*)::int AS n FROM admins');
+    const ad = await t.ctx.pool.query('SELECT count(*)::int AS n FROM accounts');
     expect(ad.rows[0].n).toBe(1);
   });
 

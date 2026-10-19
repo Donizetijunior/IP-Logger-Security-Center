@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { audit } from '../audit.ts';
 import type { Ctx } from '../context.ts';
-import { HttpError, decodeCursor, encodeCursor, iso } from '../util.ts';
+import { HttpError, decodeCursor, encodeCursor, iso, ownerScope } from '../util.ts';
 
 const listQuery = z.object({
   status: z.enum(['open', 'investigating', 'resolved']).optional(),
@@ -26,6 +26,11 @@ export function registerAlerts(app: FastifyInstance, ctx: Ctx): void {
     const q = listQuery.parse(req.query);
     const params: unknown[] = [];
     const where: string[] = [];
+    const owner = ownerScope(req);
+    if (owner) {
+      params.push(owner);
+      where.push(`a.short_link_id IN (SELECT id FROM short_links WHERE owner_id = $${params.length})`);
+    }
     if (q.status) { params.push(q.status); where.push(`a.status = $${params.length}`); }
     if (q.severity) { params.push(q.severity); where.push(`a.severity = $${params.length}`); }
     if (q.type) { params.push(q.type); where.push(`a.type = $${params.length}`); }
@@ -58,10 +63,11 @@ export function registerAlerts(app: FastifyInstance, ctx: Ctx): void {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
     const { status } = patchBody.parse(req.body);
     const { rows } = await pool.query<{ id: string; status: string }>(
-      'UPDATE alerts SET status = $2, updated_at = now() WHERE id = $1 RETURNING id, status', [id, status],
+      `UPDATE alerts SET status = $2, updated_at = now() WHERE id = $1
+       AND ($3::uuid IS NULL OR short_link_id IN (SELECT id FROM short_links WHERE owner_id = $3)) RETURNING id, status`, [id, status, ownerScope(req)],
     );
     if (!rows[0]) throw new HttpError(404, 'not_found', 'Alerta não encontrado');
-    await audit(pool, { adminId: req.session!.adminId, action: 'alert.status', resource: `alert:${id}`, result: 'success', metadata: { status } });
+    await audit(pool, { accountId: req.session!.accountId, action: 'alert.status', resource: `alert:${id}`, result: 'success', metadata: { status } });
     return rows[0];
   });
 }

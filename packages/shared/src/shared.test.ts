@@ -177,6 +177,12 @@ describe('loadConfig', () => {
     expect(c.ANALYTICS_RETENTION_DAYS).toBe(30);
     expect(c.ABUSEIPDB_ENABLED).toBe(false);
   });
+  it('variável vazia equivale a não definida (COOKIE_SECURE= não desliga o cookie seguro em produção)', () => {
+    const c = loadConfig({ ...base, NODE_ENV: 'production', LEGAL_REVIEW_ACKNOWLEDGED: 'true', COOKIE_SECURE: '' });
+    expect(c.cookieSecure).toBe(true);
+    expect(loadConfig({ ...base, NODE_ENV: 'development', COOKIE_SECURE: 'true' }).cookieSecure).toBe(true);
+    expect(loadConfig({ ...base, NODE_ENV: 'development', COOKIE_SECURE: '' }).cookieSecure).toBe(false);
+  });
   it('produção bloqueia sem decisão jurídica', () => {
     expect(() => loadConfig({ ...base, NODE_ENV: 'production' })).toThrow(/Go-live bloqueado/);
   });

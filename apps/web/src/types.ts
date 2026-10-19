@@ -10,6 +10,7 @@ export interface Link {
   expiresAt: string | null;
   createdAt: string;
   status: 'active' | 'inactive' | 'expired' | 'deleted';
+  owner?: { id: string; email: string | null };
   metrics?: { requests: number; uniqueIps: number; lastAccessAt: string | null };
 }
 
@@ -132,4 +133,48 @@ export interface ExportItem {
   maskedIp: boolean;
   createdAt: string;
   expiresAt: string;
+}
+
+export type Role = 'admin' | 'user';
+
+export interface Me {
+  email: string;
+  role: Role;
+  mustChangePassword: boolean;
+  linkQuota?: number;
+}
+
+export interface PublicConfig {
+  signupMode: 'open' | 'approval' | 'closed';
+  openSourceUrl: string;
+  shortBaseUrl: string;
+  privacyUrl: string;
+  termsVersion: string;
+  defaultLinkQuota: number;
+}
+
+export interface UserItem {
+  id: string;
+  email: string;
+  role: Role;
+  status: 'active' | 'pending' | 'suspended';
+  linkQuota: number;
+  signupSource: string;
+  mustChangePassword: boolean;
+  createdAt: string;
+  links: number;
+  events: number;
+}
+
+export interface ReportItem {
+  id: string;
+  slug: string;
+  linkId: string | null;
+  reason: string;
+  details: string | null;
+  contact: string | null;
+  status: 'open' | 'reviewing' | 'link_disabled' | 'dismissed';
+  createdAt: string;
+  targetUrl: string | null;
+  owner: { id: string; email: string; status: string } | null;
 }

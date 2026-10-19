@@ -21,12 +21,12 @@ export function redactMetadata(meta: Record<string, unknown> = {}): Record<strin
 
 export async function audit(
   pool: Pool,
-  entry: { adminId?: string | null; action: string; resource?: string | null; result: 'success' | 'failure' | 'denied'; metadata?: Record<string, unknown> },
+  entry: { accountId?: string | null; action: string; resource?: string | null; result: 'success' | 'failure' | 'denied'; metadata?: Record<string, unknown> },
 ): Promise<void> {
   try {
     await pool.query(
-      'INSERT INTO audit_events (admin_id, action, resource, result, metadata_redacted) VALUES ($1, $2, $3, $4, $5)',
-      [entry.adminId ?? null, entry.action, entry.resource ?? null, entry.result, JSON.stringify(redactMetadata(entry.metadata))],
+      'INSERT INTO audit_events (account_id, action, resource, result, metadata_redacted) VALUES ($1, $2, $3, $4, $5)',
+      [entry.accountId ?? null, entry.action, entry.resource ?? null, entry.result, JSON.stringify(redactMetadata(entry.metadata))],
     );
   } catch {
     // auditoria nunca deve derrubar a requisição; a falha é visível nos logs operacionais
