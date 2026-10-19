@@ -58,7 +58,7 @@
 	# Página de apresentação na raiz do domínio principal (arquivo estático do contêiner web).
 	# Domínios personalizados (curinga :80) NÃO passam por aqui: a raiz deles segue a regra da API.
 	@landing {
-		host {$LINKS_SITE}
+		host {$LANDING_HOST:landing.invalid}
 		path /
 	}
 	handle @landing {
@@ -69,7 +69,7 @@
 		reverse_proxy web:8080
 	}
 	@robots {
-		host {$LINKS_SITE}
+		host {$LANDING_HOST:landing.invalid}
 		path /robots.txt
 	}
 	handle @robots {
