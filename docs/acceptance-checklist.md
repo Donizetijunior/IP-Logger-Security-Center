@@ -123,3 +123,20 @@ E2E_TOTP_SECRET=... E2E_PASSWORD=... npm run test:load
 | Notas privadas: leitura única atômica (8 leituras paralelas ⇒ 1), expiração, quota, cifragem no cliente | ✅ | `tools.test.ts`, `notecrypto.test.ts` |
 | Telas das ferramentas | 🧪 | verificado no navegador (usuário comum) |
 | Reputação AbuseIPDB/GreyNoise nas ferramentas | ⚠️ não exposta (decisão de privacidade/cota) | — |
+
+## Produção — iplogger.com.br (2026-10-19)
+
+Verificado pela Internet (via Cloudflare Tunnel), com `NODE_ENV=production`, `COOKIE_SECURE=true`, `SIGNUP_MODE=open`:
+
+| Item | Resultado |
+|---|---|
+| TLS válido, HSTS, CSP, `nosniff`, `X-Frame-Options` no painel | ✅ |
+| Login do admin com senha + TOTP; cookie `__Host-iplc_session; Secure; HttpOnly; SameSite=Strict` | ✅ |
+| Link criado e aberto publicamente: `302`, `Cache-Control: no-store` | ✅ |
+| IP registrado = IP real do visitante; `X-Forwarded-For` forjado ignorado | ✅ |
+| `CF-Connecting-IP` forjado: bloqueado pela própria Cloudflare (erro 1000) antes de chegar à origem | ✅ |
+| `/metrics`, `/readyz`, `/healthz`, `/api/v1/links` (no domínio de links) ⇒ 404; API sem sessão ⇒ 401 | ✅ |
+| Raiz `iplogger.com.br/` redireciona ao painel; `/privacy` identifica o operador e o canal de contato | ✅ |
+| Dados de teste removidos após a verificação | ✅ |
+
+Pendências do operador: criar o encaminhamento `contato@iplogger.com.br` (Cloudflare Email Routing), girar o token do túnel (foi exposto no chat), e acompanhar a revisão jurídica descrita em [legal-decision.md](legal-decision.md).
