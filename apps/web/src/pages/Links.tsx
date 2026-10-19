@@ -29,10 +29,12 @@ export function LinksPage() {
 
   const [domains, setDomains] = useState<Array<{ id: string; hostname: string }>>([]);
   const [domainId, setDomainId] = useState('');
+  const [domainsLoaded, setDomainsLoaded] = useState(false);
   useEffect(() => {
     api.get<{ items: Array<{ id: string; hostname: string; status: string }> }>('/domains')
       .then((r) => setDomains(r.items.filter((d) => d.status === 'active')))
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setDomainsLoaded(true));
   }, []);
 
   const [targetUrl, setTargetUrl] = useState('');
@@ -110,14 +112,17 @@ export function LinksPage() {
           <Field label="Validade (opcional)">
             <input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="w-full" />
           </Field>
-          {domains.length > 0 && (
-            <Field label="Domínio do link" className="md:col-span-2 lg:col-span-4">
-              <select value={domainId} onChange={(e) => setDomainId(e.target.value)} className="w-full">
-                <option value="">Domínio principal ({config?.shortBaseUrl.replace(/^https?:\/\//, '')})</option>
-                {domains.map((d) => <option key={d.id} value={d.id}>{d.hostname}</option>)}
-              </select>
-            </Field>
-          )}
+          <Field label="Domínio do link" className="md:col-span-2 lg:col-span-4">
+            <select value={domainId} onChange={(e) => setDomainId(e.target.value)} className="w-full">
+              <option value="">Domínio principal ({config?.shortBaseUrl.replace(/^https?:\/\//, '') ?? 'padrão'})</option>
+              {domains.map((d) => <option key={d.id} value={d.id}>{d.hostname}</option>)}
+            </select>
+            <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+              {domainsLoaded && domains.length === 0
+                ? <>Você ainda não tem domínio personalizado <strong>ativo</strong>, por isso só o domínio principal aparece. <RouterLink to="/dominios">Cadastre e ative um domínio</RouterLink> para escolhê-lo aqui.</>
+                : <>{domains.length} domínio(s) personalizado(s) ativo(s) disponível(is). <RouterLink to="/dominios">Gerenciar domínios</RouterLink></>}
+            </p>
+          </Field>
           <Field label="Rótulo / finalidade" className="md:col-span-2 lg:col-span-3">
             <input value={label} maxLength={200} onChange={(e) => setLabel(e.target.value)} placeholder="Ex.: monitoramento de campanha autorizada" className="w-full" />
           </Field>

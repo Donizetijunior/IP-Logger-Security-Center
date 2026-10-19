@@ -137,6 +137,32 @@ export function DomainsPage() {
       />
       {policy && <p className="mb-4 text-sm" style={{ color: 'var(--muted)' }}>{MODE_TEXT[policy.mode]}{policy.max !== null && <> Você usa <strong>{policy.used}</strong> de <strong>{policy.max}</strong>.</>}</p>}
 
+      <Card className="mb-5">
+        <details open={!loading && items.length === 0}>
+          <summary className="cursor-pointer text-base font-semibold">Como adicionar um domínio (passo a passo)</summary>
+          <ol className="mt-3 flex list-decimal flex-col gap-2 pl-5 text-sm">
+            <li>
+              <strong>Cadastre o domínio</strong> abaixo (ex.: <code className="mono">go.seusite.com.br</code>). {policy && !policy.canCreate && <em>Neste serviço só o administrador cadastra domínios.</em>}
+            </li>
+            <li>
+              <strong>Comprove que ele é seu:</strong> no DNS do domínio (na Cloudflare: <em>seu domínio → DNS → Registros → Adicionar registro</em>), crie um registro <strong>TXT</strong> com o <em>nome</em> e o <em>valor</em> que aparecem no cartão do domínio (botões “Copiar”).
+            </li>
+            <li>
+              <strong>Aponte o domínio para este serviço:</strong> na Cloudflare, <em>Zero Trust → Redes → Túneis → seu túnel → Rotas → Adicionar rota → Aplicativo publicado</em>. Preencha o hostname do domínio e, em <em>URL do serviço</em>, <code className="mono">http://caddy:80</code>. O domínio precisa estar na <strong>mesma conta Cloudflare</strong> do túnel.
+            </li>
+            <li>
+              Clique em <strong>Verificar agora</strong> no cartão do domínio. Quando aparecer <em>TXT verificado</em>, <em>roteamento ok</em> e status <strong>Ativo</strong> (se houver aprovação do administrador, aguarde-a), o domínio está pronto.
+            </li>
+            <li>
+              Vá em <strong>Links → Novo link</strong>: o campo <strong>Domínio do link</strong> passa a listar o seu domínio. Escolha-o e crie o link.
+            </li>
+          </ol>
+          <p className="mt-3 text-xs" style={{ color: 'var(--muted)' }}>
+            A propagação do DNS pode levar alguns minutos. Excluir um domínio aqui <strong>não remove</strong> a rota do túnel nem os registros DNS: remova-os também na Cloudflare.
+          </p>
+        </details>
+      </Card>
+
       {policy?.canCreate && (
         <Card title="Adicionar domínio" className="mb-5">
           <form onSubmit={create} className="grid grid-cols-1 gap-3 md:grid-cols-3">
