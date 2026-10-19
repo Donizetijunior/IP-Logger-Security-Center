@@ -4,6 +4,8 @@ import type { AuthService, SessionInfo } from './auth.ts';
 import type { LinkCache } from './link-cache.ts';
 import type { Telemetry } from './telemetry.ts';
 import type { RdapClient } from './rdap.ts';
+import type { GeoLookup } from './tools/geo.ts';
+import type { Hop } from './tools/safe-http.ts';
 
 export interface Ctx {
   config: AppConfig;
@@ -12,6 +14,9 @@ export interface Ctx {
   linkCache: LinkCache;
   auth: AuthService;
   rdap: RdapClient;
+  geo: GeoLookup;
+  /** Transporte HTTP seguro (anti-SSRF) usado pelas ferramentas; substituível em testes. */
+  hop: Hop;
   encKey: Buffer;
 }
 

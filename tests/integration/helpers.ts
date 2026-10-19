@@ -6,6 +6,7 @@ import { bootstrapAdmin } from '../../apps/api/src/auth.ts';
 import { createContext } from '../../apps/api/src/create-context.ts';
 import type { Ctx } from '../../apps/api/src/context.ts';
 import type { RdapClient } from '../../apps/api/src/rdap.ts';
+import type { Hop } from '../../apps/api/src/tools/safe-http.ts';
 import { parseEncryptionKey } from '@ipl/shared';
 
 export const TEST_DATABASE_URL =
@@ -56,7 +57,7 @@ export interface Session {
 
 export async function startTestApp(
   extraEnv: Record<string, string> = {},
-  overrides: { rdap?: RdapClient } = {},
+  overrides: { rdap?: RdapClient; hop?: Hop } = {},
 ): Promise<TestApp> {
   const ctx = createContext(testEnv(extraEnv), overrides);
   await resetDatabase(ctx.pool);

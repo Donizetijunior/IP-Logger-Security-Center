@@ -12,6 +12,8 @@ import { EventsPage } from './pages/Events';
 import { IpPage } from './pages/Ip';
 import { LinksPage } from './pages/Links';
 import { LoginPage } from './pages/Login';
+import { NotePage } from './pages/Note';
+import { ToolsPage } from './pages/Tools';
 import { OverviewPage } from './pages/Overview';
 import { ReportsPage } from './pages/Reports';
 import { SettingsPage } from './pages/Settings';
@@ -24,6 +26,7 @@ const NAV_USER = [
   { to: '/links', label: 'Links' },
   { to: '/eventos', label: 'Eventos' },
   { to: '/alertas', label: 'Alertas' },
+  { to: '/ferramentas', label: 'Ferramentas' },
   { to: '/conta', label: 'Minha conta' },
 ];
 const NAV_ADMIN = [
@@ -31,6 +34,7 @@ const NAV_ADMIN = [
   { to: '/links', label: 'Links' },
   { to: '/eventos', label: 'Eventos' },
   { to: '/alertas', label: 'Alertas' },
+  { to: '/ferramentas', label: 'Ferramentas' },
   { to: '/usuarios', label: 'Usuários' },
   { to: '/denuncias', label: 'Denúncias' },
   { to: '/configuracoes', label: 'Configurações e saúde' },
@@ -101,6 +105,7 @@ export function App() {
           <Route path="/cadastro" element={<SignupPage config={config} />} />
           <Route path="/termos" element={<TermsPage />} />
           <Route path="/denunciar" element={<AbusePage />} />
+          <Route path="/nota/:id" element={<NotePage />} />
           <Route path="*" element={<LoginPage onLoggedIn={refresh} config={config} />} />
         </Routes>
       </PublicShell>
@@ -168,6 +173,8 @@ export function App() {
             <Route path="/ips/:ip" element={<IpPage />} />
             <Route path="/alertas" element={<AlertsPage />} />
             <Route path="/conta" element={<AccountPage onChanged={refresh} onLogout={logout} />} />
+            <Route path="/ferramentas" element={<ToolsPage />} />
+            <Route path="/nota/:id" element={<NotePage />} />
             <Route path="/termos" element={<TermsPage />} />
             <Route path="/denunciar" element={<AbusePage />} />
             {admin && <Route path="/usuarios" element={<UsersPage />} />}
