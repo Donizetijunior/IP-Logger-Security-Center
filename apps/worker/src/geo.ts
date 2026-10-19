@@ -15,12 +15,34 @@ export interface GeoResult {
 
 export const EMPTY_GEO: GeoResult = { country: null, region: null, city: null, asn: null, asnOrg: null };
 
-/** Bases GeoLite2 locais (City + ASN). Nunca chama serviços externos por acesso. */
+/** Nomes aceitos, em ordem de preferência. Ambos usam o formato MMDB e o mesmo esquema de campos. */
+export const CITY_FILES = ['GeoLite2-City.mmdb', 'dbip-city-lite.mmdb'];
+export const ASN_FILES = ['GeoLite2-ASN.mmdb', 'dbip-asn-lite.mmdb'];
+
+export function firstExisting(dir: string, names: string[]): string | null {
+  for (const n of names) {
+    const p = join(dir, n);
+    if (existsSync(p)) return p;
+  }
+  return null;
+}
+
+/** Fonte e atribuição exigidas pela licença de cada base. */
+export function describeSource(path: string | null): { source: string; attribution: string } | null {
+  if (!path) return null;
+  if (/GeoLite2/i.test(path)) {
+    return { source: 'GeoLite2', attribution: 'Este produto inclui dados GeoLite2 criados pela MaxMind, disponíveis em https://www.maxmind.com' };
+  }
+  return { source: 'DB-IP Lite', attribution: 'IP Geolocation by DB-IP (https://db-ip.com), licença CC BY 4.0' };
+}
+
+/** Bases de geolocalização locais (City + ASN). Nunca chama serviços externos por acesso. */
 export class GeoService {
   private city: Reader<CityResponse> | null = null;
   private asn: Reader<AsnResponse> | null = null;
   private cityMtime = 0;
   private asnMtime = 0;
+  private cityPath: string | null = null;
   private readonly dir: string;
   private readonly enabled: boolean;
 
@@ -35,18 +57,19 @@ export class GeoService {
       await this.report(pool, { state: 'disabled' });
       return;
     }
-    const cityPath = join(this.dir, 'GeoLite2-City.mmdb');
-    const asnPath = join(this.dir, 'GeoLite2-ASN.mmdb');
+    const cityPath = firstExisting(this.dir, CITY_FILES);
+    const asnPath = firstExisting(this.dir, ASN_FILES);
     let error: string | null = null;
     try {
-      if (existsSync(cityPath)) {
+      if (cityPath) {
         const m = statSync(cityPath).mtimeMs;
-        if (m !== this.cityMtime) {
+        if (m !== this.cityMtime || cityPath !== this.cityPath) {
           this.city = await open<CityResponse>(cityPath);
           this.cityMtime = m;
+          this.cityPath = cityPath;
         }
       }
-      if (existsSync(asnPath)) {
+      if (asnPath) {
         const m = statSync(asnPath).mtimeMs;
         if (m !== this.asnMtime) {
           this.asn = await open<AsnResponse>(asnPath);
@@ -56,6 +79,7 @@ export class GeoService {
     } catch (err) {
       error = (err as Error).message.slice(0, 200);
     }
+    const src = describeSource(this.cityPath ?? asnPath);
     await this.report(pool, {
       state: error ? 'error' : this.city || this.asn ? 'ready' : 'missing_databases',
       city: !!this.city,
@@ -63,7 +87,8 @@ export class GeoService {
       cityUpdatedAt: this.cityMtime ? new Date(this.cityMtime).toISOString() : null,
       asnUpdatedAt: this.asnMtime ? new Date(this.asnMtime).toISOString() : null,
       error,
-      attribution: 'Este produto inclui dados GeoLite2 criados pela MaxMind, disponíveis em https://www.maxmind.com',
+      source: src?.source ?? null,
+      attribution: src?.attribution ?? null,
     });
   }
 

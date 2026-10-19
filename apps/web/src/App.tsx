@@ -48,6 +48,7 @@ function Footer({ config }: { config: PublicConfig | null }) {
       {config && <a href={config.privacyUrl} target="_blank" rel="noreferrer">Privacidade</a>}
       <Link to="/denunciar">Denunciar abuso</Link>
       {config && <a href={config.openSourceUrl} target="_blank" rel="noreferrer">Código aberto</a>}
+      {config?.geoAttribution && <span className="basis-full">{config.geoAttribution}</span>}
     </footer>
   );
 }

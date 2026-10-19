@@ -24,14 +24,25 @@ const abuseBody = z.object({
 export function registerPublicAccount(app: FastifyInstance, ctx: Ctx, checkOrigin: (req: FastifyRequest) => void): void {
   const { config, pool } = ctx;
 
-  app.get('/public/config', async () => ({
-    signupMode: config.SIGNUP_MODE,
-    openSourceUrl: config.OPEN_SOURCE_URL,
-    shortBaseUrl: config.PUBLIC_SHORT_BASE_URL,
-    privacyUrl: `${config.PUBLIC_SHORT_BASE_URL.replace(/\/$/, '')}/privacy`,
-    termsVersion: '2026-10',
-    defaultLinkQuota: config.DEFAULT_LINK_QUOTA,
-  }));
+  app.get('/public/config', async () => {
+    // Atribuição exigida pela licença da base de geolocalização em uso (GeoLite2 ou DB-IP Lite)
+    let geoAttribution: string | null = null;
+    try {
+      const g = await pool.query<{ a: string | null }>("SELECT value->>'attribution' AS a FROM job_state WHERE key = 'geoip'");
+      geoAttribution = g.rows[0]?.a ?? null;
+    } catch {
+      /* banco indisponível: a página continua carregando sem a atribuição */
+    }
+    return {
+      geoAttribution,
+      signupMode: config.SIGNUP_MODE,
+      openSourceUrl: config.OPEN_SOURCE_URL,
+      shortBaseUrl: config.PUBLIC_SHORT_BASE_URL,
+      privacyUrl: `${config.PUBLIC_SHORT_BASE_URL.replace(/\/$/, '')}/privacy`,
+      termsVersion: '2026-10',
+      defaultLinkQuota: config.DEFAULT_LINK_QUOTA,
+    };
+  });
 
   app.post('/auth/signup', { config: { rateLimit: { max: config.SIGNUP_RATE_PER_HOUR, timeWindow: '1 hour' } } }, async (req, reply) => {
     checkOrigin(req);

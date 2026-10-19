@@ -12,7 +12,18 @@ export interface GeoInfo {
   asnOrg: string | null;
 }
 
-/** Consulta às bases GeoLite2 locais (somente leitura). Sem bases ⇒ available=false. */
+const CITY_FILES = ['GeoLite2-City.mmdb', 'dbip-city-lite.mmdb'];
+const ASN_FILES = ['GeoLite2-ASN.mmdb', 'dbip-asn-lite.mmdb'];
+
+function firstExisting(dir: string, names: string[]): string | null {
+  for (const n of names) {
+    const p = join(dir, n);
+    if (existsSync(p)) return p;
+  }
+  return null;
+}
+
+/** Consulta às bases locais (GeoLite2 ou DB-IP Lite), somente leitura. Sem bases ⇒ available=false. */
 export class GeoLookup {
   private city: Reader<CityResponse> | null = null;
   private asn: Reader<AsnResponse> | null = null;
@@ -30,10 +41,10 @@ export class GeoLookup {
     this.loaded = true;
     if (!this.enabled) return;
     try {
-      const c = join(this.dir, 'GeoLite2-City.mmdb');
-      const a = join(this.dir, 'GeoLite2-ASN.mmdb');
-      if (existsSync(c)) this.city = await open<CityResponse>(c);
-      if (existsSync(a)) this.asn = await open<AsnResponse>(a);
+      const c = firstExisting(this.dir, CITY_FILES);
+      const a = firstExisting(this.dir, ASN_FILES);
+      if (c) this.city = await open<CityResponse>(c);
+      if (a) this.asn = await open<AsnResponse>(a);
     } catch {
       // bases ilegíveis: segue sem geolocalização
     }
