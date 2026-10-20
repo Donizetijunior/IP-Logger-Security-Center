@@ -40,7 +40,7 @@ export function registerPublicAccount(app: FastifyInstance, ctx: Ctx, checkOrigi
       openSourceUrl: config.OPEN_SOURCE_URL,
       shortBaseUrl: config.PUBLIC_SHORT_BASE_URL,
       privacyUrl: `${config.PUBLIC_SHORT_BASE_URL.replace(/\/$/, '')}/privacy`,
-      termsVersion: '2026-10',
+      termsVersion: '2026-10-20',
       defaultLinkQuota: config.DEFAULT_LINK_QUOTA,
     };
   });

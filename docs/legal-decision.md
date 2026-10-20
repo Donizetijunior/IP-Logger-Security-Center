@@ -45,9 +45,19 @@ Se uma condição ocorrer: desligar `LEGAL_REVIEW_ACKNOWLEDGED`, reavaliar com a
 
 **Observação sobre a identificação:** o código-fonte é aberto e não tem "responsável", mas o **serviço hospedado** tem um operador. A LGPD (art. 9º) pede identificação do controlador e canal de contato; a opção de divulgar apenas "pessoa física" + e-mail do projeto é mais frágil do que divulgar o nome e deve ser validada por advogado.
 
+## 3.1 Revisão do aviso de privacidade e dos Termos (2026-10-20)
+
+Revisão técnico-jurídica preliminar (não substitui advogado), com ajuste do texto ao que o código realmente faz:
+
+- `/privacy` reescrito (v2026-10-20): controlador e canal da ANPD; base legal (legítimo interesse; execução do serviço para contas); dados de **contas** (antes só havia visitantes); denúncias; ferramentas e notas; cookies; transferência internacional (Cloudflare, RDAP e provedores opcionais gerados conforme a configuração); tabela de retenção, incluindo **cópias de segurança (até 14 dias além do prazo)**; direitos do art. 18 (inclui oposição e petição à ANPD); segurança e comunicação de incidentes (art. 48); menores. Removido o aviso público "modelo a revisar".
+- Termos (v2026-10-20): idade mínima (18), responsabilidade pela conta, cooperação com ordens judiciais, limitação de responsabilidade, alterações, lei aplicável e contato.
+- Termos aceitos antes desta versão continuam válidos como registro, mas a mudança relevante deve ser avisada aos usuários existentes (painel/e-mail).
+
 ## 4. Pontos que continuam em aberto (não impedem o registro, mas devem ser tratados)
 
-- Revisão do texto de `/privacy` e dos Termos por advogado.
+- Revisão do texto de `/privacy` e dos Termos por advogado (a revisão preliminar acima não a substitui).
+- Identificação do controlador: hoje "Operador do serviço (pessoa física)". O art. 9º, III, da LGPD pede a **identificação** do controlador; divulgar o nome é mais seguro juridicamente. Decisão do operador.
+- Cópias de segurança retêm eventos além dos 30 dias (já divulgado em `/privacy`); reavaliar o prazo (`BACKUP_RETENTION_DAYS`).
 - Decisão sobre **aviso ao visitante antes do redirecionamento** (opcional no produto; reduz risco de transparência).
 - RIPD/DPIA, se a ANPD ou o advogado entender exigível.
 - Avaliação da transferência internacional (Cloudflare e provedores habilitados).
