@@ -88,7 +88,16 @@ export function TermsPage() {
             </p>
           </section>
           <section>
-            <h2 className="mb-1 font-semibold">11. Lei aplicável e contato</h2>
+            <h2 className="mb-1 font-semibold">11. Histórico de versões</h2>
+            <p>
+              <strong>2026-10-20:</strong> idade mínima de 18 anos; responsabilidade pela conta; cooperação com ordens judiciais; limitação de
+              responsabilidade; regras de alteração dos Termos; lei aplicável e contato; menção à licença AGPL-3.0.
+              <br />
+              <strong>2026-10:</strong> versão inicial.
+            </p>
+          </section>
+          <section>
+            <h2 className="mb-1 font-semibold">12. Lei aplicável e contato</h2>
             <p>
               Aplica-se a lei brasileira. Fica eleito o foro da comarca de domicílio do operador, ressalvados os foros que a lei imponha
               como obrigatórios. Dúvidas, solicitações de titulares e denúncias: contato@iplogger.com.br.

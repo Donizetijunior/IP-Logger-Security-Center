@@ -167,6 +167,8 @@ export interface Me {
   role: Role;
   mustChangePassword: boolean;
   customDomains?: boolean;
+  termsOutdated?: boolean;
+  currentTermsVersion?: string;
   linkQuota?: number;
 }
 
