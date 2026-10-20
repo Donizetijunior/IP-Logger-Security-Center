@@ -43,4 +43,4 @@ Exigimos `Signed-off-by` em cada commit (`git commit -s`). Isso é a declaraçã
 
 ## Licença
 
-Defina e adicione um arquivo `LICENSE` antes de divulgar. Sem licença, o código é "todos os direitos reservados" e ninguém pode legalmente usá-lo ou contribuir. Sugestão para um serviço web: **AGPL-3.0** (obriga quem hospedar versões modificadas a publicá-las); alternativas permissivas: Apache-2.0 ou MIT.
+O projeto usa **AGPL-3.0** ([LICENSE](../LICENSE)). Quem hospedar uma versão modificada como serviço precisa publicar suas alterações. Contribuições entram sob a mesma licença (DCO).
