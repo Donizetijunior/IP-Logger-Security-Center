@@ -1,0 +1,23 @@
+name: Relatar um problema
+description: Algo não funciona como esperado (não use para vulnerabilidades — veja SECURITY.md)
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Vulnerabilidade de segurança?** Não abra issue pública. Use "Security → Report a vulnerability" neste repositório.
+        **Não cole** senhas, tokens, IPs reais de pessoas ou conteúdo do seu `.env`.
+  - type: textarea
+    id: o-que
+    attributes: { label: O que aconteceu, description: O que você esperava e o que ocorreu }
+    validations: { required: true }
+  - type: textarea
+    id: passos
+    attributes: { label: Passos para reproduzir }
+    validations: { required: true }
+  - type: input
+    id: versao
+    attributes: { label: Versão ou commit }
+  - type: textarea
+    id: ambiente
+    attributes: { label: Ambiente, description: "SO, Docker, navegador (sem dados sensíveis)" }

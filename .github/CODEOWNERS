@@ -1,0 +1,12 @@
+# Toda mudança precisa de revisão de quem mantém o projeto (exigido pela proteção da branch main).
+*                       @Donizetijunior
+
+# Áreas sensíveis: autenticação, SSRF, infraestrutura, workflows e dependências.
+/apps/api/src/auth.ts   @Donizetijunior
+/apps/api/src/tools/    @Donizetijunior
+/infra/                 @Donizetijunior
+/.github/               @Donizetijunior
+/Dockerfile             @Donizetijunior
+/docker-compose*.yml    @Donizetijunior
+/packages/database/migrations/ @Donizetijunior
+/package-lock.json      @Donizetijunior

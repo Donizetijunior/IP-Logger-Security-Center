@@ -1,5 +1,18 @@
 # Contribuindo
 
+Obrigado por querer ajudar! Leia também o [Código de conduta](CODE_OF_CONDUCT.md).
+
+## Como enviar uma contribuição
+
+1. Para algo grande, abra antes uma *issue* para combinarmos a direção.
+2. Faça um **fork**, crie uma branch (`git switch -c minha-melhoria`) e faça as mudanças.
+3. Rode `npm run ci` (veja abaixo) e faça commits **assinados com DCO**: `git commit -s -m "feat: ..."`.
+   O `-s` acrescenta `Signed-off-by: Seu Nome <email>`, declarando que você pode contribuir com aquele código ([DCO](https://developercertificate.org/)).
+4. Abra um **pull request** para a `main` preenchendo o modelo. A CI precisa passar e a mantenedora revisa antes do *merge*.
+5. Nunca inclua segredos, `.env`, dados reais de usuários ou IPs reais. **Vulnerabilidades não vão em issue/PR**: veja [SECURITY.md](SECURITY.md).
+
+Detalhes de como o repositório é protegido: [docs/repository-governance.md](docs/repository-governance.md).
+
 ## Ambiente
 
 Node.js ≥ 24 (TypeScript executado nativamente: use apenas sintaxe *erasable* — sem `enum`, `namespace` ou *parameter properties*; imports com extensão `.ts`) e Docker.

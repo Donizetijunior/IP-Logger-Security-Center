@@ -1,0 +1,12 @@
+name: Sugerir uma melhoria
+description: Ideia de funcionalidade ou ajuste
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problema
+    attributes: { label: Qual problema isso resolve? }
+    validations: { required: true }
+  - type: textarea
+    id: proposta
+    attributes: { label: Proposta, description: "Considere impacto em privacidade e segurança" }
+    validations: { required: true }

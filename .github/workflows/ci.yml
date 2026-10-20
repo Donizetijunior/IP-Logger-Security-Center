@@ -1,0 +1,35 @@
+name: CI
+
+# Roda em PRs (inclusive de forks) com permissões mínimas e SEM acesso a segredos.
+# Nunca use `pull_request_target` aqui: ele executaria código de terceiros com segredos do repositório.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Postgres e Redis de teste
+        run: docker compose -f docker-compose.test.yml up -d --wait
+      - name: Typecheck, testes e build
+        run: npm run ci
+      - name: Auditoria de dependências (somente produção)
+        run: npm audit --omit=dev --audit-level=high

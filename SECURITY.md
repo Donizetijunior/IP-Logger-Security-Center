@@ -2,7 +2,7 @@
 
 ## Reportar vulnerabilidades
 
-Não abra issue pública. Envie os detalhes (passos, impacto, versão) ao responsável pelo projeto por canal privado e aguarde confirmação antes de divulgar.
+Não abra issue pública. Use o relato privado do GitHub (**Security → Report a vulnerability**) ou escreva para **contato@iplogger.com.br** com os detalhes (passos, impacto, versão) e aguarde confirmação antes de divulgar. Responderemos o mais rápido possível e daremos crédito a quem reportar, se desejar.
 
 ## Modelo de ameaças e controles
 
