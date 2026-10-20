@@ -1,6 +1,6 @@
 # Avisos e licenças de terceiros
 
-**Licença do projeto:** não definida (`UNLICENSED` no `package.json`) — o proprietário deve escolher uma licença antes de distribuir o código.
+**Licença do projeto:** [GNU Affero General Public License v3.0](LICENSE) (`AGPL-3.0-only`). Copyright © 2026 Donizeti Junior e colaboradores. Quem hospedar uma versão modificada como serviço de rede deve disponibilizar o código-fonte correspondente aos usuários desse serviço.
 
 ## DB-IP Lite
 

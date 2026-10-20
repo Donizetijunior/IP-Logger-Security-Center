@@ -1,16 +1,14 @@
 # Abrindo o código (open source)
 
-## 1. Escolha uma licença (ainda não definida)
+## 1. Licença: AGPL-3.0
 
-Sem arquivo `LICENSE` o código é, por padrão, **todos os direitos reservados**: ninguém pode legalmente usá-lo ou modificá-lo. A escolha é sua; opções comuns:
+O código é licenciado sob a **GNU AGPL v3.0** (arquivo [LICENSE](../LICENSE), `"license": "AGPL-3.0-only"` no `package.json`). Na prática:
 
-| Licença | Efeito | Quando faz sentido |
-|---|---|---|
-| **AGPL-3.0** | Quem hospedar uma versão modificada como serviço precisa publicar suas alterações | Você quer impedir que terceiros montem um serviço fechado a partir do projeto |
-| **Apache-2.0** | Permissiva, com concessão de patentes | Você quer adoção ampla e aceita forks fechados |
-| **MIT** | Permissiva e mínima | Idem, com menos texto |
+- qualquer pessoa pode usar, estudar, modificar e hospedar o projeto;
+- quem **hospedar uma versão modificada como serviço na internet** precisa oferecer o código-fonte dessas modificações aos usuários do serviço, sob a mesma licença;
+- contribuições enviadas ao repositório são licenciadas sob a mesma AGPL-3.0 (declaração DCO no commit, veja [CONTRIBUTING.md](../CONTRIBUTING.md)).
 
-Depois de escolher: adicione `LICENSE`, ajuste `"license"` no `package.json` (hoje `UNLICENSED`) e o aviso em [NOTICE.md](../NOTICE.md). A licença do **código** não substitui os Termos de Uso do **serviço** hospedado (já previsto no §8 dos Termos).
+A licença do **código** não substitui os Termos de Uso do **serviço** hospedado (já previsto no §8 dos Termos). Bases de dados de terceiros (DB-IP, OUI) mantêm as suas próprias licenças: veja [NOTICE.md](../NOTICE.md).
 
 ## 2. Antes de publicar (checklist)
 

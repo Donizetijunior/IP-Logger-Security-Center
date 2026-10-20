@@ -66,7 +66,7 @@ docs/         arquitetura, API (OpenAPI), TI, risco, privacidade, operação, AD
 
 ## Código aberto
 
-Veja [docs/open-source.md](docs/open-source.md) (escolha de licença, o que nunca versionar e como proteger o serviço hospedado).
+Licença: **[AGPL-3.0](LICENSE)**. Veja [docs/open-source.md](docs/open-source.md) (o que nunca versionar e como proteger o serviço hospedado) e [CONTRIBUTING.md](CONTRIBUTING.md) para contribuir.
 
 ## Limitações conhecidas (leia antes de usar)
 
