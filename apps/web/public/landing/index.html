@@ -133,6 +133,22 @@ footer{border-top:1px solid var(--line);padding:34px 0 48px;color:var(--muted);f
 footer .wrap{display:flex;flex-wrap:wrap;gap:16px 32px;justify-content:space-between}
 footer nav{display:flex;flex-wrap:wrap;gap:8px 22px}
 footer a{text-decoration:none}footer a:hover{color:var(--text)}
+
+/* open source */
+.os{display:grid;grid-template-columns:1.1fr .9fr;gap:24px;align-items:stretch}
+@media(max-width:900px){.os{grid-template-columns:1fr}}
+.os-main{border:1px solid var(--line);border-radius:22px;padding:34px;background:radial-gradient(480px 220px at 0 0,rgba(79,124,255,.16),transparent 70%),var(--card)}
+.os-main p{color:var(--muted);margin:0 0 14px}
+.os-why{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px}
+@media(max-width:600px){.os-why{grid-template-columns:1fr}}
+.os-why div{border:1px solid var(--line);border-radius:14px;padding:16px;background:var(--bg2)}
+.os-why h3{margin:0 0 4px;font-size:1rem}.os-why p{margin:0;font-size:.9rem}
+.repo{border:1px solid var(--line);border-radius:22px;padding:28px;background:var(--card);display:flex;flex-direction:column;gap:14px}
+.repo .url{display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--bg2);text-decoration:none;word-break:break-all}
+.repo .url svg{flex:none;width:28px;height:28px;fill:currentColor}
+.repo .url small{display:block;color:var(--muted)}
+.repo ul{margin:0;padding-left:20px;color:var(--muted);font-size:.94rem;display:grid;gap:6px}
+.repo .cta{margin:4px 0 0}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 </style>
 </head>
@@ -146,7 +162,7 @@ footer a{text-decoration:none}footer a:hover{color:var(--text)}
       IP Logger <span class="muted" style="font-weight:500">Security Center</span>
     </a>
     <nav class="menu" aria-label="Principal">
-      <a href="#recursos">Recursos</a><a href="#como-funciona">Como funciona</a><a href="#risco">Score de risco</a><a href="#ferramentas">Ferramentas</a><a href="#faq">Dúvidas</a>
+      <a href="#open-source">Open source</a><a href="#recursos">Recursos</a><a href="#como-funciona">Como funciona</a><a href="#risco">Score de risco</a><a href="#ferramentas">Ferramentas</a><a href="#faq">Dúvidas</a>
     </nav>
     <div class="actions">
       <a class="btn" href="https://painel.iplogger.com.br/">Entrar</a>
@@ -156,7 +172,7 @@ footer a{text-decoration:none}footer a:hover{color:var(--text)}
 </header>
 
 <main id="conteudo">
-<section class="hero" style="padding-bottom:56px">
+<section class="hero" style="padding-bottom:16px">
   <div class="wrap">
     <div>
       <span class="pill"><i></i> Open source · gratuito · em português</span>
@@ -191,6 +207,39 @@ footer a{text-decoration:none}footer a:hover{color:var(--text)}
         <div class="row"><span class="mono">192.0.2.133</span><span class="muted">Nó de saída Tor</span><span class="tag t-bad">81 · Alto</span></div>
         <div class="row"><span class="mono">2001:db8::5a</span><span class="muted">Pré-visualização (bot)</span><span class="tag t-ok">5 · Baixo</span></div>
       </div>
+    </div>
+  </div>
+</section>
+
+<section id="open-source" style="padding-top:40px">
+  <div class="wrap">
+    <span class="eyebrow">Open source</span>
+    <h2>Feito às claras, para ser auditado e melhorado por todos</h2>
+    <p class="sub">Uma ferramenta que registra acessos precisa merecer confiança. Por isso o código é aberto: você pode ler, questionar, rodar no seu próprio servidor e contribuir.</p>
+    <div class="os">
+      <div class="os-main">
+        <p><strong style="color:var(--text)">Por que open source?</strong> Acreditamos que ferramentas de segurança e de privacidade devem ser transparentes: não há como confiar no que não se pode inspecionar.</p>
+        <div class="os-why">
+          <div><h3>Transparência</h3><p>Veja exatamente o que é coletado, como o score de risco é calculado e por quanto tempo os dados ficam.</p></div>
+          <div><h3>Autonomia</h3><p>Hospede você mesmo com Docker Compose e mantenha os dados sob o seu controle.</p></div>
+          <div><h3>Segurança coletiva</h3><p>Mais olhos revisando o código significam falhas encontradas e corrigidas mais cedo.</p></div>
+          <div><h3>Comunidade</h3><p>Sugira ideias, relate problemas e envie melhorias. Todo tipo de contribuição é bem-vindo.</p></div>
+        </div>
+      </div>
+      <aside class="repo" aria-label="Repositório do projeto">
+        <a class="url" href="https://github.com/Donizetijunior/IP-Logger-Security-Center" rel="noopener"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0a8 8 0 0 0-2.5 15.6c.4.1.5-.2.5-.4v-1.5c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.3 1.9.9 2.3.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8a7.6 7.6 0 0 1 4 0c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.100-1.900 3.800-3.600 4 .3.3.6.8.6 1.5v2.2c0 .2.1.5.6.4A8 8 0 0 0 8 0z"/></svg><span><small>Repositório no GitHub</small>Donizetijunior/IP-Logger-Security-Center</span></a>
+        <strong>Como contribuir</strong>
+        <ul>
+          <li>Dê uma estrela e compartilhe o projeto;</li>
+          <li>Abra uma <em>issue</em> com sugestões ou problemas;</li>
+          <li>Envie um <em>pull request</em> seguindo o guia de contribuição;</li>
+          <li>Ajude com documentação, traduções e testes.</li>
+        </ul>
+        <div class="cta">
+          <a class="btn primary" href="https://github.com/Donizetijunior/IP-Logger-Security-Center" rel="noopener">Ver o código →</a>
+          <a class="btn" href="https://github.com/Donizetijunior/IP-Logger-Security-Center/blob/main/CONTRIBUTING.md" rel="noopener">Guia de contribuição</a>
+        </div>
+      </aside>
     </div>
   </div>
 </section>
