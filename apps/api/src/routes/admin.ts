@@ -15,6 +15,7 @@ import { eraseAccount, registerUsers } from './users.ts';
 import { registerReports } from './reports.ts';
 import { registerTools } from './tools.ts';
 import { registerDomains } from './domains.ts';
+import { CURRENT_TERMS_VERSION } from '../legal.ts';
 
 const loginBody = z.object({ email: z.string().email().max(254), password: z.string().min(1).max(256) });
 const verifyBody = z.object({ challenge: z.string().min(20).max(100), code: z.string().min(6).max(32) });
@@ -115,11 +116,26 @@ export function registerAdmin(app: FastifyInstance, ctx: Ctx): void {
       }
     });
 
+    const termsState = async (accountId: string) => {
+      const { rows } = await pool.query<{ terms_accepted_at: Date | null; terms_version: string | null }>('SELECT terms_accepted_at, terms_version FROM accounts WHERE id = $1', [accountId]);
+      const r = rows[0];
+      // Só há o que "re-aceitar" quando a conta já aceitou alguma versão (o primeiro aceite acontece no cadastro/primeiro acesso)
+      return { termsOutdated: !!r?.terms_accepted_at && r.terms_version !== CURRENT_TERMS_VERSION, currentTermsVersion: CURRENT_TERMS_VERSION };
+    };
+
     priv.get('/auth/me', async (req) => ({
       authenticated: true, id: req.session!.accountId, email: req.session!.email, role: req.session!.role, mustChangePassword: req.session!.mustChangePassword,
       customDomains: config.customDomainsEmails.length === 0 || config.customDomainsEmails.includes(req.session!.email.toLowerCase()),
       linkQuota: req.session!.linkQuota, csrfToken: req.session!.csrfToken,
+      ...(await termsState(req.session!.accountId)),
     }));
+
+    // Registra o aceite da versão vigente dos Termos (aviso de alteração)
+    priv.post('/auth/accept-terms', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req) => {
+      await pool.query('UPDATE accounts SET terms_accepted_at = COALESCE(terms_accepted_at, now()), terms_version = $2 WHERE id = $1', [req.session!.accountId, CURRENT_TERMS_VERSION]);
+      await audit(pool, { accountId: req.session!.accountId, action: 'terms.accept', result: 'success', metadata: { version: CURRENT_TERMS_VERSION } });
+      return { ok: true, ...(await termsState(req.session!.accountId)) };
+    });
 
     priv.post('/auth/logout', async (req, reply) => {
       await auth.revokeSession(req.session!.id);
@@ -149,7 +165,7 @@ export function registerAdmin(app: FastifyInstance, ctx: Ctx): void {
         throw new HttpError(401, 'invalid_credentials', 'Senha atual incorreta');
       }
       if (typeof r === 'object') throw new HttpError(400, 'weak_password', r.weak);
-      await pool.query('UPDATE accounts SET terms_accepted_at = COALESCE(terms_accepted_at, now()) WHERE id = $1', [req.session!.accountId]);
+      await pool.query('UPDATE accounts SET terms_accepted_at = COALESCE(terms_accepted_at, now()), terms_version = COALESCE(terms_version, $2) WHERE id = $1', [req.session!.accountId, CURRENT_TERMS_VERSION]);
       await audit(pool, { accountId: req.session!.accountId, action: 'auth.change_password', result: 'success' });
       return { ok: true };
     });

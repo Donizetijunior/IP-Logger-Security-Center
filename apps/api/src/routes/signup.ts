@@ -6,6 +6,7 @@ import { audit } from '../audit.ts';
 import type { Ctx } from '../context.ts';
 import { stripPort } from '../domains.ts';
 import { HttpError } from '../util.ts';
+import { CURRENT_TERMS_VERSION } from '../legal.ts';
 
 const signupBody = z.object({
   email: z.string().max(254).regex(EMAIL_REGEX, 'E-mail inválido'),
@@ -40,7 +41,7 @@ export function registerPublicAccount(app: FastifyInstance, ctx: Ctx, checkOrigi
       openSourceUrl: config.OPEN_SOURCE_URL,
       shortBaseUrl: config.PUBLIC_SHORT_BASE_URL,
       privacyUrl: `${config.PUBLIC_SHORT_BASE_URL.replace(/\/$/, '')}/privacy`,
-      termsVersion: '2026-10-20',
+      termsVersion: CURRENT_TERMS_VERSION,
       defaultLinkQuota: config.DEFAULT_LINK_QUOTA,
     };
   });
@@ -54,9 +55,9 @@ export function registerPublicAccount(app: FastifyInstance, ctx: Ctx, checkOrigi
     const status = config.SIGNUP_MODE === 'open' ? 'active' : 'pending';
     try {
       const { rows } = await pool.query<{ id: string }>(
-        `INSERT INTO accounts (email, password_hash, role, status, terms_accepted_at, link_quota, signup_source)
-         VALUES ($1, $2, 'user', $3, now(), $4, 'self') RETURNING id`,
-        [body.email.trim(), await hashPassword(body.password), status, config.DEFAULT_LINK_QUOTA],
+        `INSERT INTO accounts (email, password_hash, role, status, terms_accepted_at, terms_version, link_quota, signup_source)
+         VALUES ($1, $2, 'user', $3, now(), $5, $4, 'self') RETURNING id`,
+        [body.email.trim(), await hashPassword(body.password), status, config.DEFAULT_LINK_QUOTA, CURRENT_TERMS_VERSION],
       );
       await audit(pool, { accountId: rows[0]!.id, action: 'account.signup', result: 'success', metadata: { status } });
     } catch (err) {

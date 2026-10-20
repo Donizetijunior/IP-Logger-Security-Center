@@ -20,6 +20,7 @@ import { ReportsPage } from './pages/Reports';
 import { SettingsPage } from './pages/Settings';
 import { SignupPage } from './pages/Signup';
 import { TermsPage } from './pages/Terms';
+import { TermsNotice } from './TermsNotice';
 import { UsersPage } from './pages/Users';
 
 const NAV_USER = [
@@ -78,7 +79,7 @@ export function App() {
     try {
       const r = await api.get<Me & { csrfToken: string }>('/auth/me');
       setCsrf(r.csrfToken);
-      setMe({ email: r.email, role: r.role, mustChangePassword: r.mustChangePassword, linkQuota: r.linkQuota });
+      setMe({ email: r.email, role: r.role, mustChangePassword: r.mustChangePassword, linkQuota: r.linkQuota, customDomains: r.customDomains, termsOutdated: r.termsOutdated, currentTermsVersion: r.currentTermsVersion });
     } catch (e) {
       if (!(e instanceof ApiError) || e.status !== 401) console.error('Falha ao verificar sessão');
       setCsrf(null);
@@ -169,6 +170,7 @@ export function App() {
           </div>
         </aside>
         <main id="conteudo" className="min-w-0 flex-1 p-4 md:p-8">
+          {me.termsOutdated && <TermsNotice version={me.currentTermsVersion} privacyUrl={config?.privacyUrl} onAccepted={refresh} />}
           <Routes>
             <Route path="/" element={<OverviewPage />} />
             <Route path="/links" element={<LinksPage />} />
