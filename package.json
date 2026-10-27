@@ -29,7 +29,7 @@
     "test:load": "node tests/load/redirect-load.mjs"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.6.5",
     "@types/pg": "^8.11.10",
     "typescript": "^5.9.0",
     "vitest": "^3.2.0"
